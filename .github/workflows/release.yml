@@ -52,3 +52,26 @@ jobs:
           printf '%s\n\n---\n**Download:** `%s`  \n**SHA-256:** `%s`  \n**VirusTotal report:** https://www.virustotal.com/gui/file/%s\n\n<sub>The report link matches this exact file by its SHA-256. You can verify it yourself: drop the ZIP on virustotal.com and the same report opens.</sub>\n' \
             "$BODY" "${{ steps.zip.outputs.name }}" "$SHA" "$SHA" > notes.md
           gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+
+      - name: Point the README's VirusTotal button at this release's report
+        run: |
+          SHA="${{ steps.zip.outputs.sha }}"
+          git fetch origin main
+          git checkout -B main origin/main
+          python3 - "$SHA" "$GITHUB_REF_NAME" <<'PY'
+          import re, sys, pathlib
+          sha, tag = sys.argv[1], sys.argv[2]
+          p = pathlib.Path("README.md")
+          s = p.read_text(encoding="utf-8")
+          badge = (f"[![VirusTotal](https://img.shields.io/badge/VirusTotal-{tag.replace('-', '--')}%20report-394EFF"
+                   f"?style=for-the-badge&logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/{sha})")
+          new, n = re.subn(r"\[!\[VirusTotal\]\([^)]*\)\]\([^)]*\)", badge, s)
+          if n == 0:
+              sys.exit("VirusTotal badge not found in README.md")
+          p.write_text(new, encoding="utf-8")
+          PY
+          if git diff --quiet; then echo "README already up to date"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "README: VirusTotal link for ${GITHUB_REF_NAME}"
+          git push origin main
