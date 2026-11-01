@@ -16,56 +16,76 @@ Runs on your own computer · uses your own GMGN API key · keys never leave your
 
 ---
 
-## Requirements
+## What you need
 
-- **Python 3.10+**
-- **Node.js 18+** (for `gmgn-cli`, GMGN's official command-line tool)
-- **A GMGN API key** from **[gmgn.ai/ai](https://gmgn.ai/ai)**. The free tier works; Plus is much faster. Each key is bound to your IP and your Ed25519 public key, so everyone uses their own.
+- A **Windows, Mac or Linux** computer
+- A free **GMGN account** at [gmgn.ai](https://gmgn.ai). kraken uses your own GMGN API key, and the setup page walks you through creating it.
+- For **real trading only:** a wallet in your GMGN account that's set up and funded. Without one you can still use everything else, including paper trading.
+
+That's it. The installer sets up everything else (Python, Node.js and gmgn-cli) for you.
 
 > 💡 **Get Plus without paying cash:** as of November 2026, GMGN lets you redeem **5,000 GMGN credits for 1 month of the Plus API plan**. You earn credits by trading on GMGN. Terms can change, so check the [GMGN paid plans page](https://gmgn.ai/ai?chain=bsc&tab=paid_plans) for the current offer. With Plus, set **Settings → GMGN rate limits** to 0.15 s and 4 parallel calls for much faster scans.
 
-## Quick install
+## Install on Windows (step by step)
 
-**Windows**
-```powershell
-git clone https://github.com/B3an-boi/Kraken.git
-cd Kraken
-.\install.cmd
-.\run.cmd
-```
+**1. Download.** Click the **Download** button at the top of this page, then click **`kraken-vX.X.X.zip`** under *Assets* to save it.
 
-**macOS / Linux**
+**2. Check it's safe (optional, recommended).** Go to **[virustotal.com](https://www.virustotal.com)**, choose **File**, and drop in the ZIP. It should say **"No security vendors flagged this file as malicious"**. Or click the **VirusTotal** button at the top of this page to see the report for the official file.
+
+**3. Unzip.** Right-click the ZIP → **Extract All…** → **Extract**. A good place is your *Documents* folder.
+
+**4. Install.** Open the extracted **kraken** folder and double-click **`install.cmd`**.
+- If Windows shows **"Windows protected your PC"**, click **More info → Run anyway**. This appears for any script downloaded from the internet that isn't from a paid, signed publisher.
+- If Python or Node.js are missing, the installer adds them. Click **Yes** if Windows asks for permission.
+- If it says Windows "needs a fresh window", close it and double-click **`install.cmd`** again. That happens once, right after Python or Node.js is installed.
+
+**5. Connect GMGN.** When the install finishes, kraken opens in your browser with a short setup page:
+1. Log in to **gmgn.ai** in your browser.
+2. Click **Open GMGN**. GMGN's "create API key" page opens with everything pre-filled. Create the key and **copy** it.
+3. Back in kraken, **paste** the key and click **Connect**.
+
+**6. Done!** From now on, start kraken by double-clicking the **kraken** icon on your desktop. A small black window opens alongside the browser; keep it open while you use kraken, and close it to stop kraken.
+
+## Install on Mac or Linux
+
+1. Download and unzip the release as in steps 1–3 above.
+2. Install Python 3.10+ and Node.js 18+ if you don't have them. Mac: install [Homebrew](https://brew.sh), then run `brew install python node`. Ubuntu: `sudo apt install python3 python3-venv nodejs npm`.
+3. Open a terminal in the kraken folder (Mac: right-click the folder → **New Terminal at Folder**) and run:
+   ```bash
+   bash install.sh
+   ```
+4. Your browser opens to the same setup page. Next time, start kraken with `./run.sh` in that folder.
+
+<details>
+<summary><b>Advanced: install with git</b></summary>
+
 ```bash
 git clone https://github.com/B3an-boi/Kraken.git
 cd Kraken
-./install.sh
-./run.sh
+./install.sh            # Windows: .\install.cmd
 ```
+</details>
 
-The installer sets up Python, installs `gmgn-cli`, and asks for your GMGN API key. kraken then opens at **http://127.0.0.1:8420** with live GMGN data.
+## Your keys
 
-No git? Download the ZIP from the [latest release](https://github.com/B3an-boi/Kraken/releases/latest), unzip it, and run the same commands inside the folder.
+- Setup creates a key pair **on your computer**, and GMGN links your API key to it. Both are saved in `~/.config/gmgn/.env` (`C:\Users\<you>\.config\gmgn\.env` on Windows). They never go into the kraken folder, GitHub, or anywhere else.
+- **Reconnect or change keys:** Settings → **Reconnect GMGN**.
+- **Real trading** also needs a funded wallet in your GMGN account. kraken stays on **SHADOW** (paper trading) until you switch to LIVE and confirm.
+- **On GMGN Plus?** Set **Settings → GMGN rate limits** to 0.15 s and 4 parallel calls.
 
-### Verify your download
+## Troubleshooting
 
-Before you run anything, check the ZIP is safe:
+| Problem | Fix |
+|---|---|
+| "Windows protected your PC" | Click **More info → Run anyway**. |
+| Installer says it needs a fresh window | Close it and double-click `install.cmd` again. |
+| The page says "backend offline" | The black kraken window was closed. Double-click the kraken desktop icon. |
+| GMGN rejected the key | Create the key from the page the **Open GMGN** button opens (it pre-fills your public key), copy the whole key, and paste again. |
+| Key works on GMGN but kraken gets 401/403 errors | gmgn-cli only works over IPv4. Turn off IPv6 on your network adapter, then retry. |
+| "No GMGN key found" banner | Settings → **Connect GMGN**. |
+| Checking your install | In the kraken folder run `.venv\Scripts\python.exe -m kraken doctor` (Windows) or `.venv/bin/python -m kraken doctor`. |
 
-1. Go to **[virustotal.com](https://www.virustotal.com)**, choose **File**, and drop in the `kraken-vX.X.X.zip` you downloaded.
-2. Wait for the scan. It should show **0 security vendors flagged this file**.
-3. Or just click the **VirusTotal** button at the top of this page. It opens the report for the official release ZIP. If your file is identical, uploading it opens that same report.
-
-kraken contains no .exe files. It's plain Python and JavaScript you can open and read.
-
-### Your keys
-
-- **API key (required):** read-only market data, scans and learning.
-- **Signing key (only for LIVE trading):** leave it blank to paper trade.
-
-> **Want real trading?** You need a **GMGN account with a wallet already set up and funded** before you create your API key. The key is tied to that wallet, and every LIVE buy and sell goes through it. Without a GMGN wallet you can still use everything else: scans, Base Hunter, learning, alerts and paper trading.
-
-To add or change keys later, run `python -m kraken setup` from the kraken folder (`.\.venv\Scripts\python.exe -m kraken setup` on Windows), then restart kraken. Use `python -m kraken doctor` to check your install. If you're on GMGN Plus, set **Settings → GMGN rate limits** to 0.15 s and 4 parallel calls.
-
-> Without a key, kraken falls back to a simulated market so the dashboard can still load. A yellow banner tells you when this happens. It's for troubleshooting, not trading.
+**Updating:** download the new release and unzip it to a new folder, then copy your old **`data`** folder into it to keep your settings, snapshots and positions. Run `install.cmd` in the new folder.
 
 ---
 
@@ -109,6 +129,7 @@ kraken/
 │   ├── charts.py      chart read, tight-range detection, sparklines
 │   ├── positions.py   paper/live trades, risk limits, exit monitor
 │   ├── alerts.py      ntfy / Telegram / Discord
+│   ├── setup_flow.py  first-run GMGN connection (wraps gmgn-cli config)
 │   ├── backtest.py    win-rate buckets and what-if filters
 │   └── config.py      settings with validation + persistence
 ├── web/               the dashboard (plain HTML/CSS/JS, no build step)

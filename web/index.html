@@ -133,6 +133,23 @@ main{padding:18px;max-width:1400px;margin:0 auto}
 @keyframes in{from{transform:translateY(8px);opacity:0}}
 .spin{display:inline-block;width:10px;height:10px;border:2px solid var(--glow);border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.wiz{position:fixed;inset:0;z-index:40;background:radial-gradient(900px 500px at 50% 0%,#0f2a3faa,transparent),#060b14f2;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 16px}
+.wiz.on{display:flex}
+.wiz .box{width:100%;max-width:560px;background:linear-gradient(180deg,var(--panel),var(--deep));border:1px solid var(--line2);border-radius:16px;padding:28px}
+.wiz h2{margin:0 0 6px;font-size:22px;letter-spacing:-.02em}
+.wiz .lead{color:var(--dim);margin:0 0 20px;line-height:1.5}
+.step{display:grid;grid-template-columns:30px 1fr;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
+.step .n{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--raise);font-family:var(--mono);font-size:13px;color:var(--dim)}
+.step.done .n{background:var(--glow);color:#03241c}
+.step.cur .n{border:1px solid var(--glow);color:var(--glow)}
+.step h4{margin:4px 0 6px;font-size:14px}
+.step p{margin:0 0 10px;color:var(--dim);font-size:12.5px;line-height:1.5}
+.step input{width:100%;background:var(--abyss);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:13px}
+.step input:focus{outline:none;border-color:var(--glow)}
+.wizmsg{margin-top:10px;font-size:12.5px;line-height:1.5;padding:10px 12px;border-radius:8px;display:none}
+.wizmsg.on{display:block}.wizmsg.ok{background:#3ef0c612;color:var(--glow);border:1px solid #3ef0c644}.wizmsg.bad{background:#ff6b6b12;color:var(--coral);border:1px solid #ff6b6b44}
+.wiz .foot{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:10px;flex-wrap:wrap}
+.linkbtn{background:none;border:none;color:var(--dim);text-decoration:underline;cursor:pointer;font-size:12px;padding:0}
 dialog{background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:14px;padding:22px;max-width:440px}
 dialog::backdrop{background:#000a}
 @media (max-width:760px){
@@ -219,6 +236,29 @@ dialog::backdrop{background:#000a}
     <div class="savebar" id="saveBar"><span>Unsaved changes</span><div class="row"><button class="btn" id="setUndo">Undo</button><button class="btn primary" id="setSave">Save settings</button></div></div>
   </section>
 </main>
+<div class="wiz" id="wiz" role="dialog" aria-modal="true" aria-labelledby="wizT">
+  <div class="box">
+    <h2 id="wizT">🐙 Connect kraken to GMGN</h2>
+    <p class="lead">kraken reads live market data with your own GMGN API key. It takes about two minutes, and your keys stay on this computer.</p>
+    <div class="step" id="ws1"><div class="n">1</div><div>
+      <h4>Install gmgn-cli</h4>
+      <p id="ws1t">Checking…</p>
+    </div></div>
+    <div class="step" id="ws2"><div class="n">2</div><div>
+      <h4>Create your API key on GMGN</h4>
+      <p>Log in to GMGN in your browser first. The button opens GMGN's "create API key" page with your key already filled in. Click create, then copy the API key it shows you.</p>
+      <button class="btn primary" id="wizOpen">Open GMGN</button>
+      <div class="sub" style="margin-top:8px">Want real trading later? Your GMGN account needs a wallet set up and funded. Everything else works without one.</div>
+    </div></div>
+    <div class="step" id="ws3"><div class="n">3</div><div>
+      <h4>Paste your API key</h4>
+      <input id="wizKey" type="password" placeholder="Paste the API key from GMGN" autocomplete="off" spellcheck="false" aria-label="GMGN API key">
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="wizApply">Connect</button><label class="chk"><input type="checkbox" id="wizShow"> Show key</label></div>
+      <div class="wizmsg" id="wizMsg"></div>
+    </div></div>
+    <div class="foot"><button class="linkbtn" id="wizSkip">Skip for now (simulated data only)</button><span class="sub">Saved to <span class="mono" id="wizPath">~/.config/gmgn/.env</span></span></div>
+  </div>
+</div>
 <dialog id="dlg"><h3 id="dlgT" style="margin-top:0"></h3><p id="dlgB" class="sub" style="font-size:13px;line-height:1.5"></p><div class="row" style="justify-content:flex-end"><button class="btn" id="dlgNo">Cancel</button><button class="btn primary" id="dlgYes">Confirm</button></div></dialog>
 <div id="toast"></div>
 <script src="/assets/app.js"></script>

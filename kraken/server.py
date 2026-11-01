@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, backtest, screener
+from . import __version__, backtest, screener, setup_flow
 from .alerts import Alerts
 from .config import DATA, ROOT, Settings
 from .gmgn import DemoClient, GMGNError, LiveClient, RateGate, key_status
@@ -231,6 +231,39 @@ def sell(s: SellIn):
         _err(e)
     event("sell", f"{p['mode']} sell {p['symbol']} {p['pnl_pct']:+.1%}", id=p["id"])
     return p
+
+
+# ── first-run GMGN setup ─────────────────────────────────────────────────────
+class SetupApplyIn(BaseModel):
+    api_key: str
+
+
+@app.get("/api/setup")
+def setup_status():
+    return setup_flow.status()
+
+
+@app.post("/api/setup/start")
+def setup_start():
+    try:
+        return setup_flow.start()
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/setup/apply")
+def setup_apply(b: SetupApplyIn):
+    try:
+        r = setup_flow.apply(b.api_key)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    if r["result"] in ("ok", "saved_unverified"):
+        with _lock:
+            _clients.clear()                       # next call builds a LiveClient with the new key
+        event("setup", "GMGN key connected" + (" (not verified yet)" if r["result"] != "ok" else ""))
+    return r
 
 
 # ── alerts & log ─────────────────────────────────────────────────────────────

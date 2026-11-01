@@ -6,22 +6,32 @@ import getpass, os, sys, webbrowser
 
 
 def setup():
-    from .gmgn import GMGN_ENV, gmgn_bin, key_status, write_env
+    """Terminal version of the setup page: same gmgn-cli config flow."""
+    from . import setup_flow
     print("\n🐙 kraken setup\n")
-    if not gmgn_bin():
-        print("gmgn-cli isn't installed. Install Node.js 18+, then run:  npm install -g gmgn-cli\n")
-    print("Get an API key at https://gmgn.ai/ai (it's bound to your IP and your Ed25519 public key).")
-    print(f"Keys are saved only on this computer, in {GMGN_ENV}\n")
-    k = getpass.getpass("GMGN API key (input is hidden): ").strip()
-    if not k:
-        print("No key entered. kraken needs one for real data; run  python -m kraken setup  again when you have it.")
+    st = setup_flow.status()
+    if not st["cli"]:
+        print("gmgn-cli isn't installed. Install Node.js 18+, then run:  npm install -g gmgn-cli")
         return
-    print("\nThe private (signing) key is ONLY needed for LIVE trading. Leave it empty to stay paper-only.")
-    pk = getpass.getpass("GMGN private key (Enter to skip): ").strip()
-    write_env(k, pk)
-    s = key_status()
-    print(f"\nSaved. API key: {'✓' if s['api_key'] else '✗'} · private key: {'✓' if s['private_key'] else '— (paper only)'}")
-    print("Restart kraken if it is already running.")
+    if st["api_key"] and input("A GMGN key is already connected. Replace it? [y/N] ").strip().lower() != "y":
+        return
+    link = setup_flow.start()["link"]
+    print("1. Log in to GMGN in your browser.")
+    print("2. Open this link (your public key is pre-filled), create the API key, and copy it:\n")
+    print("   " + link + "\n")
+    try:
+        webbrowser.open(link)
+    except Exception:
+        pass
+    key = getpass.getpass("3. Paste the API key here (input is hidden): ").strip()
+    if not key:
+        print("No key entered. Run  python -m kraken setup  again when you have it.")
+        return
+    r = setup_flow.apply(key)
+    print({"ok": "\n✓ Connected. Start kraken and it will use live GMGN data.",
+           "saved_unverified": "\nKey saved, but GMGN didn't answer the test call (often a network blip). Try starting kraken.",
+           "auth_fail": "\n✗ GMGN rejected that key. Copy the whole key, and create it from the link above so it matches your key pair.",
+           "no_keypair": "\n✗ Key pair missing. Run setup again."}.get(r["result"], "\n✗ " + r["message"]))
 
 
 def doctor():

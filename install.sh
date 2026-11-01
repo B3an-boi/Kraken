@@ -15,7 +15,8 @@ echo "[1/4] Python OK ($PY)"
 [ -x .venv/bin/python ] || "$PY" -m venv .venv
 .venv/bin/python -m pip install --upgrade pip --quiet
 .venv/bin/python -m pip install -r requirements.txt --quiet
-echo "[2/4] Dependencies installed in .venv"
+echo "[2/4] Python packages installed"
+
 if ! command -v gmgn-cli >/dev/null 2>&1; then
   if ! command -v npm >/dev/null 2>&1; then
     echo "Node.js 18+ is required for gmgn-cli. Install it (macOS: brew install node · Ubuntu: see https://nodejs.org) and run again."
@@ -25,12 +26,8 @@ if ! command -v gmgn-cli >/dev/null 2>&1; then
   npm install -g gmgn-cli || { echo "npm install failed. Try: sudo npm install -g gmgn-cli"; exit 1; }
 fi
 echo "[3/4] gmgn-cli ready"
-if grep -qE '^GMGN_API_KEY=.+' "$HOME/.config/gmgn/.env" 2>/dev/null; then
-  echo "[4/4] GMGN API key found"
-else
-  echo "[4/4] Connect your GMGN API key (get one at https://gmgn.ai/ai)"
-  .venv/bin/python -m kraken setup
-fi
 chmod +x run.sh 2>/dev/null || true
-echo; echo "Done! Start kraken with:  ./run.sh"
-echo "Change keys later with:   .venv/bin/python -m kraken setup"; echo
+echo "[4/4] kraken installed"
+echo; echo "All set! Starting kraken. Your browser opens to a setup page that connects your GMGN key."
+echo "Next time, start it with:  ./run.sh"; echo
+exec .venv/bin/python -m kraken

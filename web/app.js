@@ -274,8 +274,51 @@ function renderKeys(){
   const k=ST.status&&ST.status.keys;if(!k)return;
   const it=(ok,label,note)=>`<div class="row" style="gap:8px;margin:4px 0"><span class="tag ${ok?'good':'warn'}">${ok?'✓':'—'}</span><span>${label}</span><span class="sub">${note}</span></div>`;
   $('#keyCard').innerHTML=`<h3>GMGN connection</h3><div class="sub" style="margin-bottom:8px">Keys stay on this computer in <span class="mono">${esc(k.env_path)}</span>. Kraken only listens on 127.0.0.1.</div>`+
-   it(k.cli,'gmgn-cli installed',k.cli?'':'npm install -g gmgn-cli')+it(k.api_key,'API key',k.api_key?'live market data':'required: run python -m kraken setup')+it(k.private_key,'Signing key',k.private_key?'LIVE trading possible':'paper trading only (that\'s fine)');
+   it(k.cli,'gmgn-cli installed',k.cli?'':'npm install -g gmgn-cli')+it(k.api_key,'API key',k.api_key?'live market data':'required: run python -m kraken setup')+it(k.private_key,'Signing key',k.private_key?'LIVE trading possible':'paper trading only (that\'s fine)')+`<button class="btn small" id="reconnect" style="margin-top:10px">${k.api_key?'Reconnect GMGN':'Connect GMGN'}</button>`;
+  $('#reconnect').onclick=()=>openWizard(true);
 }
+
+/* first-run GMGN setup */
+let wizLink=null,wizSkipped=false;
+try{wizSkipped=sessionStorage.getItem('kraken.wizskip')==='1'}catch(e){}
+function wizStep(n,state){const el=$('#ws'+n);el.classList.toggle('done',state==='done');el.classList.toggle('cur',state==='cur')}
+function wizMsg(txt,ok){const m=$('#wizMsg');m.className='wizmsg on '+(ok?'ok':'bad');m.textContent=txt}
+async function openWizard(force){
+  const s=await api('/api/setup');
+  if(s.ready&&!force){$('#wiz').classList.remove('on');return}
+  $('#wiz').classList.add('on');$('#wizPath').textContent=s.env_path;
+  if(!s.cli){
+    $('#ws1t').innerHTML='gmgn-cli isn\'t installed yet. Run <b>install.cmd</b> again (Windows) or <b>./install.sh</b> (Mac/Linux), or in a terminal run <span class="mono">npm install -g gmgn-cli</span>. Then click <b>Check again</b>.<br><button class="btn small" id="wizRecheck" style="margin-top:8px">Check again</button>';
+    wizStep(1,'cur');wizStep(2,'');wizStep(3,'');$('#wizOpen').disabled=true;$('#wizApply').disabled=true;
+    $('#wizRecheck').onclick=()=>openWizard(force);return;
+  }
+  $('#ws1t').textContent='gmgn-cli is installed.';wizStep(1,'done');wizStep(2,'cur');wizStep(3,'');
+  $('#wizOpen').disabled=false;$('#wizApply').disabled=false;
+}
+$('#wizOpen').onclick=async()=>{
+  const btn=$('#wizOpen');btn.disabled=true;btn.textContent='Preparing…';
+  try{if(!wizLink)wizLink=(await api('/api/setup/start',{method:'POST'})).link;
+    window.open(wizLink,'_blank','noopener');wizStep(2,'done');wizStep(3,'cur');$('#wizKey').focus();}
+  catch(e){wizMsg(e.message,false)}
+  btn.disabled=false;btn.textContent='Open GMGN again';
+};
+$('#wizShow').onchange=e=>{$('#wizKey').type=e.target.checked?'text':'password'};
+$('#wizKey').addEventListener('keydown',e=>{if(e.key==='Enter')$('#wizApply').click()});
+$('#wizApply').onclick=async()=>{
+  const key=$('#wizKey').value.trim();if(!key){wizMsg('Paste your API key first.',false);return}
+  const btn=$('#wizApply');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Connecting…';
+  try{const r=await api('/api/setup/apply',{method:'POST',body:{api_key:key}});
+    if(r.result==='ok'||r.result==='saved_unverified'){
+      $('#wizKey').value='';wizStep(3,'done');
+      wizMsg(r.result==='ok'?'Connected! Loading live GMGN data…':'Key saved, but GMGN didn\'t answer the test call. That\'s usually a network blip; kraken will retry on its own.',true);
+      setTimeout(()=>{$('#wiz').classList.remove('on');refresh(true)},1600);
+    }else if(r.result==='auth_fail'){wizMsg('GMGN rejected that key. Make sure you copied the whole key, and that you created it from the page the Open GMGN button opened (it pre-fills your public key). Then paste it again.',false)}
+    else if(r.result==='no_keypair'){wizLink=null;wizMsg('Click Open GMGN first. It creates the key pair your API key gets linked to.',false)}
+    else wizMsg('Something went wrong: '+(r.message||'unknown error'),false);
+  }catch(e){wizMsg(e.message,false)}
+  btn.disabled=false;btn.textContent='Connect';
+};
+$('#wizSkip').onclick=()=>{$('#wiz').classList.remove('on');wizSkipped=true;try{sessionStorage.setItem('kraken.wizskip','1')}catch(e){}};
 
 /* loop */
 async function refresh(force){
@@ -289,4 +332,5 @@ async function refresh(force){
 }
 try{const v=localStorage.getItem('kraken.view');if(v&&$('#v-'+v))ST.view=v;$('#sRej').checked=localStorage.getItem('kraken.rej')!=='0'}catch(e){}
 show(ST.view);runBT();
+api('/api/setup').then(s=>{if(!s.ready&&!wizSkipped)openWizard(false)}).catch(()=>{});
 setInterval(()=>{if(!document.hidden&&ST.view!=='settings')refresh()},6000);
