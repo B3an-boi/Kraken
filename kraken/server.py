@@ -215,6 +215,7 @@ class BuyIn(BaseModel):
 class SellIn(BaseModel):
     id: str
     reason: str = "manual"
+    pct: float = 100
 
 
 @app.get("/api/positions")
@@ -238,10 +239,10 @@ def buy(b: BuyIn):
 def sell(s: SellIn):
     try:
         pos = next((x for x in POS.items if x["id"] == s.id), None)
-        p = POS.sell(client(pos["chain"] if pos else None), s.id, s.reason)
+        p = POS.sell(client(pos["chain"] if pos else None), s.id, s.reason, s.pct)
     except Exception as e:
         _err(e)
-    event("sell", f"{p['mode']} sell {p['symbol']} {p['pnl_pct']:+.1%}", id=p["id"])
+    event("sell", f"{p['mode']} sell {s.pct:g}% of {p['symbol']} at {p['pnl_pct']:+.1%}", id=p["id"])
     return p
 
 

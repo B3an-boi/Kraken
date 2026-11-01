@@ -36,16 +36,15 @@ class Positions:
         op = self.open_list()
         day0 = time.time() - 86400
         realized = sum(p.get("pnl", 0) for p in self.items if p["status"] == "closed" and p.get("exit_ts", 0) >= day0)
+        realized += sum(p.get("realized", 0) for p in self.items if p["status"] == "open")
         r = self.settings["risk"]
         return dict(open=len(op), max_positions=r["max_positions"], exposure=sum(p["size"] for p in op),
                     max_exposure=r["max_exposure"], realized_24h=realized, daily_loss_limit=r["daily_loss_limit"],
                     unrealized=sum(p.get("pnl", 0) for p in op))
 
-    def _check_risk(self, size: float, address: str):
+    def _check_risk(self, size: float, address: str, adding: bool = False):
         r, s = self.settings["risk"], self.summary()
-        if any(p["address"] == address for p in self.open_list()):
-            raise RiskError("you already hold this token")
-        if s["open"] >= r["max_positions"]:
+        if not adding and s["open"] >= r["max_positions"]:
             raise RiskError(f"max positions reached ({r['max_positions']})")
         if s["exposure"] + size > r["max_exposure"] + 1e-12:
             raise RiskError(f"exposure would exceed {r['max_exposure']}")
@@ -89,8 +88,13 @@ class Positions:
         if size <= 0:
             raise RiskError("size must be positive")
         with self.lock:
-            self._check_risk(size, address)
+            ch = chain or self.settings["chain"]
+            existing = next((x for x in self.open_list() if x["address"] == address and x.get("chain", "sol") == ch), None)
+            self._check_risk(size, address, adding=existing is not None)
             live = False if paper else self._live(client)   # paper orders never become real trades
+            if existing and existing["mode"] != ("LIVE" if live else "SHADOW"):
+                raise RiskError(f"you hold this token as a {'paper' if existing['mode'] == 'SHADOW' else 'LIVE'} position; "
+                                "close it before trading it in the other mode")
             price = client.price(address)
             if not price:
                 raise RiskError("couldn't get a price for this token")
@@ -104,16 +108,36 @@ class Positions:
                 if not fill["filled"]:
                     raise RiskError(f"swap not confirmed (status {fill['status']}) — no position recorded")
                 price = client.price(address) or price
-            p = dict(id=uuid.uuid4().hex[:10], address=address, symbol=symbol, chain=chain or self.settings["chain"],
+            fill_rec = dict(ts=time.time(), side="buy", size=size, price=price, tx=fill["hash"])
+            if existing:
+                # add to the position: average entry is weighted by what was spent at each price
+                p = existing
+                tokens = p["size"] / p["entry_price"] + size / price
+                p["size"] = round(p["size"] + size, 12)
+                p["entry_price"] = p["size"] / tokens
+                p.setdefault("fills", []).append(fill_rec)
+                p.update(last_price=price, pnl_pct=price / p["entry_price"] - 1,
+                         pnl=p["size"] * (price / p["entry_price"] - 1))
+                if take_profit is not None:
+                    p["tp"] = take_profit
+                if stop_loss is not None:
+                    p["sl"] = stop_loss
+                self._save()
+                return p
+            p = dict(id=uuid.uuid4().hex[:10], address=address, symbol=symbol, chain=ch,
                      mode="LIVE" if live else "SHADOW", size=size, entry_price=price, entry_ts=time.time(),
                      last_price=price, peak=price, pnl=0.0, pnl_pct=0.0, status="open", source=source,
                      order_id=fill["order_id"], tx=fill["hash"], signals=[], entry_top10=None,
-                     tp=take_profit, sl=stop_loss)
+                     tp=take_profit, sl=stop_loss, fills=[fill_rec], realized=0.0)
             self.items.append(p)
             self._save()
             return p
 
-    def sell(self, client, pid: str, reason: str = "manual") -> dict:
+    def sell(self, client, pid: str, reason: str = "manual", pct: float = 100) -> dict:
+        """Sell pct% of the position (100 = close it). Partial sells realize that slice's P/L."""
+        pct = float(pct)
+        if not (0 < pct <= 100):
+            raise RiskError("sell percent must be between 0 and 100")
         with self.lock:
             p = next((x for x in self.items if x["id"] == pid and x["status"] == "open"), None)
             if not p:
@@ -123,13 +147,22 @@ class Positions:
                 if not client.live:
                     raise RiskError("this is a LIVE position but no GMGN key is loaded; check your key")
                 native, _ = NATIVE[p["chain"]]
-                fill = self._await_fill(client, client.swap(p["address"], native, percent=100,
+                fill = self._await_fill(client, client.swap(p["address"], native, percent=pct,
                                                             slippage=self.settings["risk"]["slippage"]))
                 if not fill["filled"]:
                     raise RiskError(f"sell not confirmed (status {fill['status']}) — position still open")
                 p["exit_tx"] = fill["hash"]
-            p.update(status="closed", exit_price=price, exit_ts=time.time(), exit_reason=reason,
-                     pnl=p["size"] * (price / p["entry_price"] - 1), pnl_pct=price / p["entry_price"] - 1)
+            part = p["size"] * pct / 100
+            gain = part * (price / p["entry_price"] - 1)
+            p.setdefault("fills", []).append(dict(ts=time.time(), side="sell", size=part, price=price,
+                                                  pct=pct, tx=p.get("exit_tx") if p["mode"] == "LIVE" else None))
+            p["realized"] = p.get("realized", 0.0) + gain
+            if pct < 100:
+                p["size"] = round(p["size"] - part, 12)
+                p.update(last_price=price, pnl_pct=price / p["entry_price"] - 1, pnl=p["size"] * (price / p["entry_price"] - 1))
+            else:
+                p.update(status="closed", exit_price=price, exit_ts=time.time(), exit_reason=reason,
+                         pnl=p["realized"], pnl_pct=price / p["entry_price"] - 1)
             self._save()
             return p
 

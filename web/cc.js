@@ -241,7 +241,7 @@ const TV={
     this.chart=chart;
     const bars=raw.map(([t,o,h,l,c])=>({time:t,open:o,high:h,low:l,close:c}));
     const cs=chart.addCandlestickSeries({upColor:'#8b8cff',downColor:'#ff6a4d',borderUpColor:'#8b8cff',borderDownColor:'#ff6a4d',wickUpColor:'#8b8cff',wickDownColor:'#ff6a4d',priceFormat:{type:'custom',formatter:fmtPx,minMove:1e-12}});
-    cs.setData(bars);
+    cs.setData(bars);this.cs=cs;this.bars=bars;this.res=res;
     const closes=bars.map(b=>b.close),ma=(n)=>bars.map((b,i)=>i>=n-1?{time:b.time,value:closes.slice(i-n+1,i+1).reduce((a,x)=>a+x,0)/n}:null).filter(Boolean);
     const MAS=[[20,'#ff5b37'],[50,'#8b8cff'],[200,'#3ddc84']].filter(([n])=>bars.length>n+2);
     const maS={},maV={};for(const [n,col] of MAS){const data=ma(n);maV[n]=new Map(data.map(x=>[x.time,x.value]));maS[n]=chart.addLineSeries({color:col,lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});maS[n].setData(data)}
@@ -258,6 +258,50 @@ const TV={
     show(last,bars.length-1);
     const idx=new Map(bars.map((b,i)=>[b.time,i]));
     chart.subscribeCrosshairMove(p=>{const b=p&&p.time!=null?bars[idx.get(p.time)]:null;show(b||last,b?idx.get(p.time):bars.length-1)});
+    this.trade();this.syncPos();
+    clearInterval(this.timer);this.timer=setInterval(()=>{if(CC.token===this.addr&&document.body.contains($('#tvBox')))this.syncPos();else clearInterval(this.timer)},8000);
+  },
+  /* corner trade box: buy adds to the position (weighted average entry), sells take 25/50/100% */
+  trade(){
+    const box=$('#tvBox');if(!box||$('#tvTrade'))return;
+    const live=ST.status&&ST.status.mode==='LIVE',nat=chainNow()==='sol'?'SOL':chainNow()==='bsc'?'BNB':'ETH',def=(ST.settings&&ST.settings.risk.buy_size)||0.1;
+    box.insertAdjacentHTML('beforeend',`<div class="tvtrade" id="tvTrade">
+      <div class="row" style="justify-content:space-between;gap:6px"><b style="font-size:12px">Quick trade</b><span class="tag ${live?'bad':''}" style="margin:0">${live?'LIVE':'paper'}</span></div>
+      <div class="tvsize"><input id="tqSize" type="number" step="0.01" min="0" value="${def}" aria-label="Size in ${nat}"><span>${nat}</span></div>
+      <div class="tvq">${[0.1,0.5,1].map(v=>`<button data-sz="${v}">${v}</button>`).join('')}</div>
+      <button class="btn primary tvbuy" id="tqBuy">Buy</button>
+      <div class="tvsell">${[25,50,100].map(v=>`<button data-sell="${v}">Sell ${v===100?'all':v+'%'}</button>`).join('')}</div>
+      <div class="tvpos" id="tqPos"></div></div>`);
+    $('#tvTrade').onclick=e=>e.stopPropagation();
+    $('#tvTrade').querySelectorAll('[data-sz]').forEach(b=>b.onclick=()=>{$('#tqSize').value=b.dataset.sz});
+    $('#tqBuy').onclick=async()=>{const sz=parseFloat($('#tqSize').value);if(!(sz>0)){toast('Enter a size',true);return}
+      const sym=(document.querySelector('.hero h2')||{}).firstChild?.textContent?.trim()||'?';
+      if(live&&!(await confirmDlg(`Buy ${esc(sym)} for real?`,`Swap <b>${sz} ${nat}</b> into ${esc(sym)}. This is irreversible.`,'Buy now')))return;
+      try{const p=await api('/api/buy',{method:'POST',body:{address:this.addr,symbol:sym,size:sz,source:'chart'}});toast(`${p.mode==='LIVE'?'Bought':'Paper buy'} ${sz} ${nat} · avg ${fmtPx(p.entry_price)}`);this.syncPos();loadStatus()}catch(err){toast(err.message,true)}};
+    $('#tvTrade').querySelectorAll('[data-sell]').forEach(b=>b.onclick=async()=>{const p=this.pos;if(!p){toast('No open position on this token',true);return}
+      const pct=+b.dataset.sell;if(p.mode==='LIVE'&&!(await confirmDlg(`Sell ${pct}% for real?`,`Sells ${pct}% of your ${esc(p.symbol)} position with a real swap.`,'Sell')))return;
+      try{const q=await api('/api/sell',{method:'POST',body:{id:p.id,pct,reason:'chart'}});toast(`Sold ${pct}% · realized ${(q.realized>=0?'+':'')}${(q.realized||0).toFixed(4)} ${nat}`);this.syncPos();loadStatus()}catch(err){toast(err.message,true)}});
+  },
+  async syncPos(){
+    let d;try{d=await api('/api/positions')}catch(e){return}
+    const p=d.open.find(x=>x.address===this.addr)||null;this.pos=p;
+    const nat=chainNow()==='sol'?'SOL':chainNow()==='bsc'?'BNB':'ETH';
+    if(this.avgLine&&this.cs){try{this.cs.removePriceLine(this.avgLine)}catch(e){}this.avgLine=null}
+    const closed=d.closed.find(x=>x.address===this.addr);
+    const fills=(p&&p.fills)||(closed&&closed.fills)||[];
+    if(this.cs&&this.bars&&this.bars.length){
+      const step=this.bars.length>1?this.bars[1].time-this.bars[0].time:60,first=this.bars[0].time,lastT=this.bars[this.bars.length-1].time;
+      const marks=fills.filter(f=>f.ts>=first-step).map(f=>{const tt=Math.min(lastT,first+Math.floor((f.ts-first)/step)*step);const buy=f.side==='buy';
+        return {time:tt,position:buy?'belowBar':'aboveBar',color:buy?'#8b8cff':'#ff6a4d',shape:buy?'arrowUp':'arrowDown',text:buy?`B ${+f.size.toFixed(3)}`:`S ${f.pct?f.pct+'%':''}`}}).sort((a,b)=>a.time-b.time);
+      this.cs.setMarkers(marks);
+      if(p){const up=p.pnl_pct>=0;this.avgLine=this.cs.createPriceLine({price:p.entry_price,color:up?'#8b8cff':'#ff6a4d',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,
+        title:`AVG ${spct(p.pnl_pct,1)} · ${p.pnl>=0?'+':''}${p.pnl.toFixed(4)} ${nat}`})}
+    }
+    const el=$('#tqPos');if(!el)return;
+    el.innerHTML=p?`<div class="kv2"><span>Size</span><b>${+p.size.toFixed(4)} ${nat}</b></div><div class="kv2"><span>Avg entry</span><b>${fmtPx(p.entry_price)}</b></div>
+      <div class="kv2"><span>Now</span><b>${fmtPx(p.last_price)}</b></div><div class="kv2"><span>Unrealized</span><b class="${p.pnl>=0?'up':'down'}">${p.pnl>=0?'+':''}${p.pnl.toFixed(4)} (${spct(p.pnl_pct,1)})</b></div>
+      ${p.realized?`<div class="kv2"><span>Realized</span><b class="${p.realized>=0?'up':'down'}">${p.realized>=0?'+':''}${p.realized.toFixed(4)}</b></div>`:''}<div class="sub" style="margin-top:4px">${(p.fills||[]).filter(f=>f.side==='buy').length} buys · ${p.mode==='LIVE'?'live':'paper'}</div>`
+      :closed&&Date.now()/1000-(closed.exit_ts||0)<3600?`<div class="sub">Closed ${ago(closed.exit_ts)} · <b class="${closed.pnl>=0?'up':'down'}">${closed.pnl>=0?'+':''}${closed.pnl.toFixed(4)} ${nat}</b></div>`:'<div class="sub">No position yet. Buy to start; each buy updates your average entry.</div>';
   }
 };
 function fmtPx(v){if(v==null||!isFinite(v))return '—';const a=Math.abs(v),sg=v<0?'-':'';if(a>=1000)return sg+a.toLocaleString(undefined,{maximumFractionDigits:2});if(a>=1)return sg+a.toFixed(4);if(a===0)return '0';
