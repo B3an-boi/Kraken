@@ -9,7 +9,7 @@ Find coins resting in a quiet floor after their first pump, before the breakout.
 Runs on your own computer · uses your own GMGN API key · keys never leave your machine · paper trading by default
 
 [![Download](https://img.shields.io/github/v/release/B3an-boi/Kraken?label=Download&style=for-the-badge&color=3ef0c6)](https://github.com/B3an-boi/Kraken/releases/latest)
-[![VirusTotal](https://img.shields.io/badge/VirusTotal-v0.1.0%20report-394EFF?style=for-the-badge&logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/39552c073558562004034e0ff95a2990fdc3c91c61fa6db620d404a78d4ca7a2)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-v0.1.1%20report-394EFF?style=for-the-badge&logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/5bda58fce46c68448b4b84fd60f5aa77d392300d541053f6d8fffbeaff3ef858)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 </div>
