@@ -16,6 +16,18 @@ Runs on your own computer · uses your own GMGN API key · keys never leave your
 
 ---
 
+## Screenshots
+
+**Discover:** live KPIs, the smart-money network, the screener, money flow, live trades and call-outs on one screen.
+
+<img src="docs/screenshots/discover.png" alt="kraken Discover dashboard: KPI cards, smart-money network graph, screener and live trades" width="100%">
+
+**Token page:** TradingView-style chart with a paper or live trade box, your average entry line with live P/L, and buy markers on the candles.
+
+<img src="docs/screenshots/chart.png" alt="kraken token chart with the quick-trade box, average-entry line and buy markers" width="100%">
+
+---
+
 ## What you need
 
 - A **Windows, Mac or Linux** computer

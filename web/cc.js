@@ -325,8 +325,10 @@ const TV={
     const fills=(p&&p.fills)||(closed&&closed.fills)||[];
     if(this.cs&&this.bars&&this.bars.length){
       const step=this.bars.length>1?this.bars[1].time-this.bars[0].time:60,first=this.bars[0].time,lastT=this.bars[this.bars.length-1].time;
-      const marks=fills.filter(f=>f.ts>=first-step).map(f=>{const tt=Math.min(lastT,first+Math.floor((f.ts-first)/step)*step);const buy=f.side==='buy';
-        return {time:tt,position:buy?'belowBar':'aboveBar',color:buy?'#8b8cff':'#ff6a4d',shape:buy?'arrowUp':'arrowDown',text:buy?`B ${+f.size.toFixed(3)}`:`S ${f.pct?f.pct+'%':''}`}}).sort((a,b)=>a.time-b.time);
+      // one marker per candle and side: several buys on the same candle show as "B 1.5 ×3" instead of a stack of arrows
+      const grp=new Map();for(const f of fills){if(f.ts<first-step)continue;const tt=Math.min(lastT,first+Math.floor((f.ts-first)/step)*step),k=tt+f.side;const g=grp.get(k)||{time:tt,side:f.side,n:0,size:0};g.n++;g.size+=f.size||0;grp.set(k,g)}
+      const marks=[...grp.values()].map(g=>{const buy=g.side==='buy';return {time:g.time,position:buy?'belowBar':'aboveBar',color:buy?'#8b8cff':'#ff6a4d',shape:buy?'arrowUp':'arrowDown',
+        text:`${buy?'B':'S'} ${+g.size.toFixed(3)}${g.n>1?' ×'+g.n:''}`}}).sort((a,b)=>a.time-b.time);
       this.cs.setMarkers(marks);
       if(p){const up=p.pnl_pct>=0;this.avgLine=this.cs.createPriceLine({price:p.entry_price,color:up?'#8b8cff':'#ff6a4d',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,
         title:`AVG ${spct(p.pnl_pct,1)} · ${p.pnl>=0?'+':''}${p.pnl.toFixed(4)} ${nat}`})}
