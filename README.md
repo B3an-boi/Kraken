@@ -9,7 +9,7 @@ Paste a contract address and get a 0–100 safety score with every deduction exp
 Runs on your own computer · uses your own GMGN API key · keys never leave your machine · paper trading by default
 
 [![Download](https://img.shields.io/github/v/release/B3an-boi/Kraken?label=Download&style=for-the-badge&color=3ef0c6)](https://github.com/B3an-boi/Kraken/releases/latest)
-[![VirusTotal](https://img.shields.io/badge/VirusTotal-v0.2.0%20report-394EFF?style=for-the-badge&logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/9377af9a2490502c57ad7a9689f5d3f6554464a6a57bce318597065851128b81)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-v0.2.1%20report-394EFF?style=for-the-badge&logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/9089954902fc1dccc9ab4f4b5c0665ba37f2e41b5e605e43f6fe3ae9e4e37d90)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 </div>
