@@ -22,9 +22,9 @@ Runs on your own computer · uses your own GMGN API key · keys never leave your
 
 <img src="docs/screenshots/discover.png" alt="kraken Discover dashboard: KPI cards, smart-money network graph, screener and live trades" width="100%">
 
-**Token page:** TradingView-style chart with a paper or live trade box, your average entry line with live P/L, and buy markers on the candles.
+**Token page:** TradingView-style chart with a paper or live trade box. Buy, sell 25/50/100% or set limit orders right on the chart; buys and sells are marked on the candles and your P/L is tracked as you go.
 
-<img src="docs/screenshots/chart.png" alt="kraken token chart with the quick-trade box, average-entry line and buy markers" width="100%">
+<img src="docs/screenshots/chart.png" alt="kraken token chart with the quick-trade box and buy and sell markers" width="100%">
 
 ---
 
