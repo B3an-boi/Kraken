@@ -260,6 +260,13 @@ dialog::backdrop{background:#000a}
 .tvsell button{color:var(--down)}
 .tvsell button:hover{border-color:var(--down)}
 .tvbuy{width:100%;padding:8px}
+.tvtabs{display:grid;grid-template-columns:1fr 1fr;background:var(--abyss);border:1px solid var(--line2);border-radius:9px;padding:2px}
+.tvtabs button{background:none;border:none;color:var(--dim);font:500 11.5px var(--sans);padding:5px 0;border-radius:7px;cursor:pointer}
+.tvtabs button.on{background:var(--raise);color:var(--text)}
+.tvq:has(> :nth-child(4)){grid-template-columns:repeat(4,1fr)}
+.tvexp{width:100%;margin-top:4px;background:var(--abyss);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:5px 6px;font:11.5px var(--sans)}
+.tvord{border-top:1px solid var(--line);padding-top:6px;font-size:11.5px}
+.tvx{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;padding:0 0 0 4px}.tvx:hover{color:var(--down)}
 .tvpos{border-top:1px solid var(--line);padding-top:8px;font-size:11.5px}
 .kv2{display:flex;justify-content:space-between;gap:6px;padding:2px 0}
 .kv2 span{color:var(--dim)}.kv2 b{font:500 11.5px var(--mono)}

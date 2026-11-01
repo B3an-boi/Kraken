@@ -258,7 +258,9 @@ const TV={
     show(last,bars.length-1);
     const idx=new Map(bars.map((b,i)=>[b.time,i]));
     chart.subscribeCrosshairMove(p=>{const b=p&&p.time!=null?bars[idx.get(p.time)]:null;show(b||last,b?idx.get(p.time):bars.length-1)});
+    this.avgLine=null;this.ordLines=[];this.pvLine=null;
     this.trade();this.syncPos();
+    chart.subscribeClick(p=>{if(this.tab!=='lmt'||!p||!p.point)return;const px=cs.coordinateToPrice(p.point.y);if(px>0){$('#tqPx').value=+px.toPrecision(5);this.preview()}});
     clearInterval(this.timer);this.timer=setInterval(()=>{if(CC.token===this.addr&&document.body.contains($('#tvBox')))this.syncPos();else clearInterval(this.timer)},8000);
   },
   /* corner trade box: buy adds to the position (weighted average entry), sells take 25/50/100% */
@@ -267,22 +269,54 @@ const TV={
     const live=ST.status&&ST.status.mode==='LIVE',nat=chainNow()==='sol'?'SOL':chainNow()==='bsc'?'BNB':'ETH',def=(ST.settings&&ST.settings.risk.buy_size)||0.1;
     box.insertAdjacentHTML('beforeend',`<div class="tvtrade" id="tvTrade">
       <div class="row" style="justify-content:space-between;gap:6px"><b style="font-size:12px">Quick trade</b><span class="tag ${live?'bad':''}" style="margin:0">${live?'LIVE':'paper'}</span></div>
+      <div class="tvtabs"><button data-tab="mkt" class="on">Market</button><button data-tab="lmt">Limit</button></div>
+      <div id="tqLim" style="display:none">
+        <div class="tvsize"><input id="tqPx" type="number" step="any" min="0" placeholder="Limit price" aria-label="Limit price"><span>price</span></div>
+        <div class="tvq" style="margin-top:4px">${[-20,-10,10,50].map(v=>`<button data-off="${v}">${v>0?'+':''}${v}%</button>`).join('')}</div>
+        <div class="sub" id="tqHint" style="margin-top:4px">Click the chart to set a price.</div>
+        <select id="tqExp" aria-label="Order expiry" class="tvexp"><option value="1">expires in 1h</option><option value="24" selected>expires in 24h</option><option value="168">expires in 7d</option></select>
+      </div>
       <div class="tvsize"><input id="tqSize" type="number" step="0.01" min="0" value="${def}" aria-label="Size in ${nat}"><span>${nat}</span></div>
       <div class="tvq">${[0.1,0.5,1].map(v=>`<button data-sz="${v}">${v}</button>`).join('')}</div>
       <button class="btn primary tvbuy" id="tqBuy">Buy</button>
       <div class="tvsell">${[25,50,100].map(v=>`<button data-sell="${v}">Sell ${v===100?'all':v+'%'}</button>`).join('')}</div>
       <div class="tvpos" id="tqPos"></div></div>`);
-    $('#tvTrade').onclick=e=>e.stopPropagation();
+    $('#tvTrade').onclick=e=>e.stopPropagation();this.tab='mkt';
+    $('#tvTrade').querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{this.tab=b.dataset.tab;$('#tvTrade').querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x===b));
+      const L=this.tab==='lmt';$('#tqLim').style.display=L?'':'none';$('#tqBuy').textContent=L?'Place buy order':'Buy';
+      $('#tvTrade').querySelectorAll('[data-sell]').forEach(s=>s.textContent=(L?'@ ':'Sell ')+(s.dataset.sell==100?'all':s.dataset.sell+'%'));
+      if(L&&!$('#tqPx').value&&this.bars)$('#tqPx').value=+this.bars[this.bars.length-1].close.toPrecision(5);this.preview()});
+    $('#tvTrade').querySelectorAll('[data-off]').forEach(b=>b.onclick=()=>{const now=this.bars&&this.bars[this.bars.length-1].close;if(now){$('#tqPx').value=+(now*(1+b.dataset.off/100)).toPrecision(5);this.preview()}});
+    $('#tqPx').oninput=()=>this.preview();
     $('#tvTrade').querySelectorAll('[data-sz]').forEach(b=>b.onclick=()=>{$('#tqSize').value=b.dataset.sz});
     $('#tqBuy').onclick=async()=>{const sz=parseFloat($('#tqSize').value);if(!(sz>0)){toast('Enter a size',true);return}
       const sym=(document.querySelector('.hero h2')||{}).firstChild?.textContent?.trim()||'?';
+      if(this.tab==='lmt')return this.place('buy',{size:sz,symbol:sym});
       if(live&&!(await confirmDlg(`Buy ${esc(sym)} for real?`,`Swap <b>${sz} ${nat}</b> into ${esc(sym)}. This is irreversible.`,'Buy now')))return;
       try{const p=await api('/api/buy',{method:'POST',body:{address:this.addr,symbol:sym,size:sz,source:'chart'}});toast(`${p.mode==='LIVE'?'Bought':'Paper buy'} ${sz} ${nat} · avg ${fmtPx(p.entry_price)}`);this.syncPos();loadStatus()}catch(err){toast(err.message,true)}};
     $('#tvTrade').querySelectorAll('[data-sell]').forEach(b=>b.onclick=async()=>{const p=this.pos;if(!p){toast('No open position on this token',true);return}
-      const pct=+b.dataset.sell;if(p.mode==='LIVE'&&!(await confirmDlg(`Sell ${pct}% for real?`,`Sells ${pct}% of your ${esc(p.symbol)} position with a real swap.`,'Sell')))return;
+      const pct=+b.dataset.sell;if(this.tab==='lmt')return this.place('sell',{pct,symbol:p.symbol});if(p.mode==='LIVE'&&!(await confirmDlg(`Sell ${pct}% for real?`,`Sells ${pct}% of your ${esc(p.symbol)} position with a real swap.`,'Sell')))return;
       try{const q=await api('/api/sell',{method:'POST',body:{id:p.id,pct,reason:'chart'}});toast(`Sold ${pct}% · realized ${(q.realized>=0?'+':'')}${(q.realized||0).toFixed(4)} ${nat}`);this.syncPos();loadStatus()}catch(err){toast(err.message,true)}});
   },
+  /* limit order type follows from where the price sits versus now: buy below = dip, above = breakout; sell above = target, below = stop */
+  ltype(side,px){const now=this.bars[this.bars.length-1].close;return side==='buy'?(px<now?'buy_low':'buy_high'):(px>now?'take_profit':'stop_loss')},
+  preview(){
+    if(this.pvLine&&this.cs){try{this.cs.removePriceLine(this.pvLine)}catch(e){}this.pvLine=null}
+    const px=parseFloat(($('#tqPx')||{}).value),h=$('#tqHint');if(this.tab!=='lmt'||!(px>0)||!this.cs){if(h)h.textContent='Click the chart to set a price.';return}
+    const now=this.bars[this.bars.length-1].close,d=px/now-1;
+    this.pvLine=this.cs.createPriceLine({price:px,color:'#c9c9cf',lineWidth:1,lineStyle:LightweightCharts.LineStyle.SparseDotted,axisLabelVisible:true,title:'limit '+spct(d,1)});
+    if(h)h.innerHTML=`${spct(d,1)} vs now · buy = ${d<0?'buy the dip':'buy the breakout'}, sell = ${d>0?'take profit':'stop loss'}`;
+  },
+  async place(side,{size,pct,symbol}){
+    const px=parseFloat($('#tqPx').value);if(!(px>0)){toast('Set a limit price (click the chart)',true);return}
+    const type=this.ltype(side,px),live=ST.status&&ST.status.mode==='LIVE',nat=chainNow()==='sol'?'SOL':chainNow()==='bsc'?'BNB':'ETH';
+    const what=side==='buy'?`buy ${size} ${nat} of ${esc(symbol)}`:`sell ${pct}% of ${esc(symbol)}`;
+    if(live&&!(await confirmDlg('Place a LIVE limit order?',`GMGN will ${what} when the price reaches <b>${fmtPx(px)}</b>. Real funds.`,'Place order')))return;
+    try{const r=await api('/api/orders',{method:'POST',body:{address:this.addr,symbol,type,trigger_price:px,size:size||null,pct:pct||100,expire_hours:+$('#tqExp').value}});
+      toast(`${r.mode==='LIVE'?'Live':'Paper'} order: ${what} at ${fmtPx(px)}`);$('#tqPx').value='';this.preview();this.syncPos()}catch(e){toast(e.message,true)}
+  },
   async syncPos(){
+    this.syncOrders();
     let d;try{d=await api('/api/positions')}catch(e){return}
     const p=d.open.find(x=>x.address===this.addr)||null;this.pos=p;
     const nat=chainNow()==='sol'?'SOL':chainNow()==='bsc'?'BNB':'ETH';
@@ -302,6 +336,19 @@ const TV={
       <div class="kv2"><span>Now</span><b>${fmtPx(p.last_price)}</b></div><div class="kv2"><span>Unrealized</span><b class="${p.pnl>=0?'up':'down'}">${p.pnl>=0?'+':''}${p.pnl.toFixed(4)} (${spct(p.pnl_pct,1)})</b></div>
       ${p.realized?`<div class="kv2"><span>Realized</span><b class="${p.realized>=0?'up':'down'}">${p.realized>=0?'+':''}${p.realized.toFixed(4)}</b></div>`:''}<div class="sub" style="margin-top:4px">${(p.fills||[]).filter(f=>f.side==='buy').length} buys · ${p.mode==='LIVE'?'live':'paper'}</div>`
       :closed&&Date.now()/1000-(closed.exit_ts||0)<3600?`<div class="sub">Closed ${ago(closed.exit_ts)} · <b class="${closed.pnl>=0?'up':'down'}">${closed.pnl>=0?'+':''}${closed.pnl.toFixed(4)} ${nat}</b></div>`:'<div class="sub">No position yet. Buy to start; each buy updates your average entry.</div>';
+  },
+  async syncOrders(){
+    let o;try{o=await api('/api/orders')}catch(e){return}
+    if(CC.token!==this.addr)return;
+    const NAME={buy_low:'BUY DIP',buy_high:'BUY BREAKOUT',take_profit:'TAKE PROFIT',stop_loss:'STOP'},COL={buy_low:'#8b8cff',buy_high:'#8b8cff',take_profit:'#3ddc84',stop_loss:'#ff6a4d'};
+    const mine=o.paper.filter(x=>x.address===this.addr).map(x=>({id:x.id,live:false,type:x.type,px:+x.trigger,amt:x.type.startsWith('buy')?`${x.size}`:`${x.pct||100}%`}))
+      .concat((o.live||[]).filter(x=>(x.base_token||x.token_address)===this.addr).map(x=>({id:x.order_id||x.id,live:true,type:x.sub_order_type||x.order_type,px:parseFloat(x.check_price),amt:x.amount_in||''})));
+    (this.ordLines||[]).forEach(l=>{try{this.cs.removePriceLine(l)}catch(e){}});this.ordLines=[];
+    if(this.cs)mine.filter(m=>m.px>0).forEach(m=>this.ordLines.push(this.cs.createPriceLine({price:m.px,color:COL[m.type]||'#c9c9cf',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:true,title:`${NAME[m.type]||m.type} ${m.amt}${m.live?' · live':''}`})));
+    let el=$('#tqOrd');if(!el){const pos=$('#tqPos');if(!pos)return;pos.insertAdjacentHTML('afterend','<div class="tvord" id="tqOrd"></div>');el=$('#tqOrd')}
+    el.innerHTML=mine.length?mine.map(m=>`<div class="kv2"><span style="color:${COL[m.type]||'inherit'}">${(NAME[m.type]||m.type).toLowerCase()} ${esc(m.amt)}</span><b>${fmtPx(m.px)} <button class="tvx" data-oc="${esc(m.id)}" ${m.live?'data-live="1"':''} title="Cancel order" aria-label="Cancel order">×</button></b></div>`).join(''):'';
+    el.style.display=mine.length?'':'none';
+    el.querySelectorAll('[data-oc]').forEach(b=>b.onclick=async()=>{try{await api('/api/orders/cancel',{method:'POST',body:{id:b.dataset.oc,live:!!b.dataset.live}});toast('Order cancelled');this.syncOrders()}catch(e){toast(e.message,true)}});
   }
 };
 function fmtPx(v){if(v==null||!isFinite(v))return '—';const a=Math.abs(v),sg=v<0?'-':'';if(a>=1000)return sg+a.toLocaleString(undefined,{maximumFractionDigits:2});if(a>=1)return sg+a.toFixed(4);if(a===0)return '0';

@@ -234,7 +234,7 @@ class PaperOrders:
         tmp.write_text(json.dumps(self.items, indent=1), encoding="utf-8")
         tmp.replace(ORDERS_PATH)
 
-    def create(self, address, symbol, side_type, trigger_price, size=None, expire_s=86400, chain="sol") -> dict:
+    def create(self, address, symbol, side_type, trigger_price, size=None, expire_s=86400, chain="sol", pct=100) -> dict:
         if side_type not in ("buy_low", "buy_high", "take_profit", "stop_loss"):
             raise RiskError("unknown order type")
         if not trigger_price or trigger_price <= 0:
@@ -243,7 +243,7 @@ class PaperOrders:
             raise RiskError("you don't hold this token, so there's nothing to sell")
         o = dict(id=uuid.uuid4().hex[:10], address=address, symbol=symbol, type=side_type, trigger=float(trigger_price),
                  size=float(size or self.pos.settings["risk"]["buy_size"]), created=time.time(),
-                 expires=time.time() + expire_s, status="open", mode="SHADOW", chain=chain)
+                 expires=time.time() + expire_s, status="open", mode="SHADOW", chain=chain, pct=float(pct))
         with self.lock:
             self.items.append(o)
             self._save()
@@ -289,7 +289,7 @@ class PaperOrders:
                         if not p:
                             o["status"] = "cancelled"
                             continue
-                        self.pos.sell(client, p["id"], reason=o["type"].replace("_", "-") + " order")
+                        self.pos.sell(client, p["id"], reason=o["type"].replace("_", "-") + " order", pct=o.get("pct", 100))
                     o.update(status="filled", filled_ts=time.time(), fill_price=px)
                     done.append(o)
                 except RiskError as e:

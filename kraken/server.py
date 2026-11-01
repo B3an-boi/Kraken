@@ -394,6 +394,7 @@ class OrderIn(BaseModel):
     type: str                 # buy_low / buy_high / take_profit / stop_loss
     trigger_price: float
     size: float | None = None
+    pct: float = 100          # sell orders: share of the position to sell
     expire_hours: float = 24
 
 
@@ -413,6 +414,8 @@ def get_orders():
 def create_order(o: OrderIn):
     if o.type not in ("buy_low", "buy_high", "take_profit", "stop_loss"):
         raise HTTPException(400, "unknown order type")
+    if not (0 < o.pct <= 100):
+        raise HTTPException(400, "sell share must be between 1 and 100%")
     if not (0 < o.expire_hours <= 24 * 30):
         raise HTTPException(400, "expiry must be between 0 and 30 days")
     c = client()
@@ -425,12 +428,12 @@ def create_order(o: OrderIn):
                 r = c.limit_order(o.address, o.type, o.trigger_price, amount_in=float(o.size or S["risk"]["buy_size"]) * 10 ** dec,
                                   slippage=S["risk"]["slippage"], expire_s=o.expire_hours * 3600)
             else:
-                r = c.limit_order(o.address, o.type, o.trigger_price, amount_pct=100,
+                r = c.limit_order(o.address, o.type, o.trigger_price, amount_pct=o.pct,
                                   slippage=S["risk"]["slippage"], expire_s=o.expire_hours * 3600)
             event("order", f"LIVE {o.type.replace('_', ' ')} order on {screener.clean_symbol(o.symbol)} at {o.trigger_price:.6g}")
             return dict(mode="LIVE", result=r)
         p = ORDERS.create(o.address, screener.clean_symbol(o.symbol), o.type, o.trigger_price, o.size, o.expire_hours * 3600,
-                          chain=_chain())
+                          chain=_chain(), pct=o.pct)
         event("order", f"paper {o.type.replace('_', ' ')} order on {p['symbol']} at {o.trigger_price:.6g}")
         return dict(mode="SHADOW", result=p)
     except Exception as e:
