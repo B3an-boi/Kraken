@@ -94,7 +94,7 @@ def set_settings(patch: dict):
     try:
         if patch.get("mode") == "LIVE":
             if not is_live():
-                raise ValueError("LIVE needs gmgn-cli and a GMGN API key (you're on demo data)")
+                raise ValueError("LIVE needs gmgn-cli and a GMGN API key (no key found, so this is a simulated market)")
             if not key_status()["private_key"]:
                 raise ValueError("LIVE needs GMGN_PRIVATE_KEY — run: python -m kraken setup")
         out = S.update(patch)
@@ -292,7 +292,7 @@ def _start():
             EVENTS.appendleft(json.loads(line))
     except Exception:
         pass
-    event("start", f"kraken {__version__} started · {'live GMGN data' if is_live() else 'demo data'} · {S['mode']}")
+    event("start", f"kraken {__version__} started · {'live GMGN data' if is_live() else 'NO GMGN KEY: simulated market'} · {S['mode']}")
     threading.Thread(target=loop, daemon=True).start()
 
 

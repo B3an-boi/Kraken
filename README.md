@@ -6,15 +6,19 @@
 
 Find coins resting in a quiet floor after their first pump, before the breakout. Snapshot every find, grade what happened next, and let a small model learn which setups actually work, from *your* data.
 
-Runs on your own computer · keys never leave it · paper trading by default · works with no key (demo mode)
+Runs on your own computer · uses your own GMGN API key · keys never leave your machine · paper trading by default
 
 </div>
 
 ---
 
-## Quick install
+## Requirements
 
-You need **Python 3.10+**. Node.js is optional (only for live GMGN data).
+- **Python 3.10+**
+- **Node.js 18+** (for `gmgn-cli`, GMGN's official command-line tool)
+- **A GMGN API key** from **[gmgn.ai/ai](https://gmgn.ai/ai)**. The free tier works; Plus is much faster. Each key is bound to your IP and your Ed25519 public key, so everyone uses their own.
+
+## Quick install
 
 **Windows**
 ```powershell
@@ -32,24 +36,18 @@ cd Kraken
 ./run.sh
 ```
 
-kraken opens at **http://127.0.0.1:8420**. It starts on **demo data** (a simulated market), so you can try every feature before connecting anything.
+The installer sets up Python, installs `gmgn-cli`, and asks for your GMGN API key. kraken then opens at **http://127.0.0.1:8420** with live GMGN data.
 
-No git? Click **Code → Download ZIP** on GitHub, unzip, and run the same install/run commands inside the folder.
+No git? Click **Code → Download ZIP** on GitHub, unzip, and run the same commands inside the folder.
 
-### Connect real GMGN data (optional)
+### Your keys
 
-1. Install Node.js 18+, then `npm install -g gmgn-cli` (the installer offers this).
-2. Get an API key at **[gmgn.ai/ai](https://gmgn.ai/ai)**. It's bound to your IP and your Ed25519 public key, so each person uses their own.
-3. Run the setup wizard and paste the key:
-   ```bash
-   .venv/bin/python -m kraken setup          # macOS / Linux
-   .\.venv\Scripts\python.exe -m kraken setup  # Windows
-   ```
-4. Restart kraken. The top bar switches from **demo data** to **GMGN live data**.
+- **API key (required):** read-only market data, scans and learning.
+- **Signing key (only for LIVE trading):** leave it blank to paper trade.
 
-The signing (private) key is **only** needed for LIVE trading. Leave it blank to stay paper-only.
+To add or change keys later, run `python -m kraken setup` from the kraken folder (`.\.venv\Scripts\python.exe -m kraken setup` on Windows), then restart kraken. Use `python -m kraken doctor` to check your install. If you're on GMGN Plus, set **Settings → GMGN rate limits** to 0.15 s and 4 parallel calls.
 
-Check your install any time with `python -m kraken doctor`.
+> Without a key, kraken falls back to a simulated market so the dashboard can still load. A yellow banner tells you when this happens. It's for troubleshooting, not trading.
 
 ---
 
@@ -83,7 +81,7 @@ More detail: **[How it works](docs/how-it-works.md)** · **[Settings reference](
 kraken/
 ├── kraken/
 │   ├── server.py      FastAPI app, endpoints and background loop
-│   ├── gmgn.py        gmgn-cli client, rate gate, demo market
+│   ├── gmgn.py        gmgn-cli client, rate gate, simulated fallback
 │   ├── screener.py    safety gates + momentum score
 │   ├── hunter.py      Base Hunter scan, flow polling, labeling
 │   ├── basehunter.py  floor detection, features, scoring, sample store, model
@@ -104,7 +102,7 @@ kraken/
 |---|---|---|
 | `KRAKEN_PORT` | `8420` | Port to serve on |
 | `KRAKEN_HOST` | `127.0.0.1` | Bind address. Changing it exposes kraken on your network; API calls from other machines are still refused unless `KRAKEN_ALLOW_REMOTE=1` |
-| `KRAKEN_DEMO` | off | `1` forces demo data even when a key is set |
+| `KRAKEN_DEMO` | off | `1` forces the simulated market even when a key is set (for testing the UI) |
 | `KRAKEN_DATA` | `./data` | Where settings, snapshots and positions are stored |
 | `KRAKEN_NO_BROWSER` | off | Any value stops kraken from opening a browser tab |
 

@@ -55,7 +55,7 @@ class Positions:
         if self.settings["mode"] != "LIVE":
             return False
         if not client.live:
-            raise RiskError("LIVE mode needs a GMGN API key — you're on demo data")
+            raise RiskError("LIVE mode needs a GMGN API key (no key found, so this is a simulated market)")
         if not key_status()["private_key"]:
             raise RiskError("LIVE mode needs GMGN_PRIVATE_KEY in your gmgn env file (run: python -m kraken setup)")
         return True
@@ -109,7 +109,7 @@ class Positions:
             price = client.price(p["address"]) or p["last_price"]
             if p["mode"] == "LIVE":
                 if not client.live:
-                    raise RiskError("this is a LIVE position but kraken is on demo data — check your key")
+                    raise RiskError("this is a LIVE position but no GMGN key is loaded; check your key")
                 native, _ = NATIVE[p["chain"]]
                 fill = self._await_fill(client, client.swap(p["address"], native, percent=100,
                                                             slippage=self.settings["risk"]["slippage"]))

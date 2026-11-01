@@ -25,7 +25,7 @@ if (-not $py) {
     Write-Host "(or from https://www.python.org/downloads/ - tick 'Add python.exe to PATH'), then run this installer again."
     exit 1
 }
-Write-Host "[1/3] Python OK ($($py -join ' '))" -ForegroundColor Green
+Write-Host "[1/4] Python OK ($($py -join ' '))" -ForegroundColor Green
 
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
     $exe = $py[0]; $rest = @($py | Select-Object -Skip 1)
@@ -33,19 +33,30 @@ if (-not (Test-Path ".venv\Scripts\python.exe")) {
 }
 & .venv\Scripts\python.exe -m pip install --upgrade pip --quiet
 & .venv\Scripts\python.exe -m pip install -r requirements.txt --quiet
-Write-Host "[2/3] Dependencies installed in .venv" -ForegroundColor Green
+Write-Host "[2/4] Dependencies installed in .venv" -ForegroundColor Green
 
-$gm = Get-Command gmgn-cli -ErrorAction SilentlyContinue
-if ($gm) {
-    Write-Host "[3/3] gmgn-cli found" -ForegroundColor Green
-} elseif (Get-Command npm -ErrorAction SilentlyContinue) {
-    $a = Read-Host "[3/3] Install gmgn-cli for live GMGN data? (needed only with an API key) [y/N]"
-    if ($a -match '^[yY]') { npm install -g gmgn-cli }
+if (-not (Get-Command gmgn-cli -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Host "Node.js 18+ is required for gmgn-cli." -ForegroundColor Yellow
+        Write-Host "Install it with:  winget install -e --id OpenJS.NodeJS.LTS"
+        Write-Host "(or from https://nodejs.org), open a NEW terminal, then run this installer again."
+        exit 1
+    }
+    Write-Host "Installing gmgn-cli..."
+    npm install -g gmgn-cli
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+}
+Write-Host "[3/4] gmgn-cli ready" -ForegroundColor Green
+
+$envFile = Join-Path $HOME ".config\gmgn\.env"
+if ((Test-Path $envFile) -and (Select-String -Path $envFile -Pattern '^GMGN_API_KEY=.+' -Quiet)) {
+    Write-Host "[4/4] GMGN API key found" -ForegroundColor Green
 } else {
-    Write-Host "[3/3] Skipped gmgn-cli (Node.js not installed). kraken runs on demo data without it." -ForegroundColor Yellow
+    Write-Host "[4/4] Connect your GMGN API key (get one at https://gmgn.ai/ai)" -ForegroundColor Cyan
+    & .venv\Scripts\python.exe -m kraken setup
 }
 
 Write-Host ""
 Write-Host "Done! Start kraken with:  .\run.cmd   (or double-click run.cmd)" -ForegroundColor Cyan
-Write-Host "Optional - connect your GMGN key:  .\.venv\Scripts\python.exe -m kraken setup"
+Write-Host "Change keys later with:   .\.venv\Scripts\python.exe -m kraken setup"
 Write-Host ""

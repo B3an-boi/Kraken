@@ -4,7 +4,7 @@
 
 kraken talks to GMGN only through the public **gmgn-cli** command-line tool, using your own API key. Every call goes through a single rate gate that spaces calls (default 1.2 s apart for the free tier), limits how many run at once, and stops sending after a 429 until the ban expires. Sending during a ban only extends it.
 
-With no key, kraken uses a **demo market**: about 110 synthetic tokens that pump, flush, base and break out (or bleed) in real time. Charts are deterministic per token and minute, so the learning loop works in demo mode too.
+If no key is configured, kraken falls back to a **simulated market** (about 110 synthetic tokens that pump, flush, base and break out or bleed) so the dashboard still loads for troubleshooting. Don't use it for trading decisions. Snapshots from it go into the same learning files, so connect your key before leaving auto-scan running.
 
 ## Screener
 

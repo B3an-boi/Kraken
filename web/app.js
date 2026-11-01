@@ -38,7 +38,7 @@ async function loadStatus(){
   const s=await api('/api/status');ST.status=s;
   $('#ver').textContent='v'+s.version;
   $('#srcPill').className='pill '+(s.live_data?'live':'demo');
-  $('#srcTxt').textContent=s.live_data?'GMGN live data':(s.forced_demo?'demo (forced)':'demo data');
+  $('#srcTxt').textContent=s.live_data?'GMGN live data':(s.forced_demo?'simulated (forced)':'no key · simulated');
   $('#demoBanner').classList.toggle('on',!s.live_data);
   const real=s.mode==='LIVE';
   $('#modeBtn').className='pill modebtn'+(real?' real':'');
@@ -274,7 +274,7 @@ function renderKeys(){
   const k=ST.status&&ST.status.keys;if(!k)return;
   const it=(ok,label,note)=>`<div class="row" style="gap:8px;margin:4px 0"><span class="tag ${ok?'good':'warn'}">${ok?'✓':'—'}</span><span>${label}</span><span class="sub">${note}</span></div>`;
   $('#keyCard').innerHTML=`<h3>GMGN connection</h3><div class="sub" style="margin-bottom:8px">Keys stay on this computer in <span class="mono">${esc(k.env_path)}</span>. Kraken only listens on 127.0.0.1.</div>`+
-   it(k.cli,'gmgn-cli installed',k.cli?'':'npm install -g gmgn-cli')+it(k.api_key,'API key',k.api_key?'live market data':'demo data until set: run python -m kraken setup')+it(k.private_key,'Signing key',k.private_key?'LIVE trading possible':'paper trading only (that\'s fine)');
+   it(k.cli,'gmgn-cli installed',k.cli?'':'npm install -g gmgn-cli')+it(k.api_key,'API key',k.api_key?'live market data':'required: run python -m kraken setup')+it(k.private_key,'Signing key',k.private_key?'LIVE trading possible':'paper trading only (that\'s fine)');
 }
 
 /* loop */
