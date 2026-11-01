@@ -22,6 +22,8 @@ Runs on your own computer · uses your own GMGN API key · keys never leave your
 - **Node.js 18+** (for `gmgn-cli`, GMGN's official command-line tool)
 - **A GMGN API key** from **[gmgn.ai/ai](https://gmgn.ai/ai)**. The free tier works; Plus is much faster. Each key is bound to your IP and your Ed25519 public key, so everyone uses their own.
 
+> 💡 **Get Plus without paying cash:** as of November 2026, GMGN lets you redeem **5,000 GMGN credits for 1 month of the Plus API plan**. You earn credits by trading on GMGN. Terms can change, so check the [GMGN paid plans page](https://gmgn.ai/ai?chain=bsc&tab=paid_plans) for the current offer. With Plus, set **Settings → GMGN rate limits** to 0.15 s and 4 parallel calls for much faster scans.
+
 ## Quick install
 
 **Windows**
