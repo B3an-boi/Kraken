@@ -83,13 +83,41 @@ class RateGate:
                 self.calls += 1
             out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env,
                                  encoding="utf-8", errors="replace")
-            err = (out.stderr or "") + (out.stdout or "")[:300]
-            if "429" in err or "rate limit" in err.lower():
-                m = re.search(r"(?:reset|retry)[^0-9]{0,20}(\d+)", err, re.I)
+            wait_s = rate_limit_wait(out)
+            if wait_s is not None:
                 with self.lock:
-                    self.banned_until = time.time() + (int(m.group(1)) if m else 300) + 5
-                raise GMGNError("rate-limited by GMGN (429); pausing calls")
+                    self.banned_until = time.time() + wait_s + 5
+                raise GMGNError(f"rate-limited by GMGN (429), pausing {wait_s + 5}s")
             return out
+
+
+_RL_MARK = re.compile(r"RATE[_ ]?LIMIT|too many requests|(?:HTTP|status(?: code)?)\s*:?\s*429", re.I)
+_RL_429 = re.compile(r"(?<![\d.])429(?![\d.])")
+
+
+def rate_limit_wait(out) -> int | None:
+    """Seconds to back off if this gmgn-cli result is a real rate-limit error, else None.
+
+    A real ban carries both an HTTP 429 and GMGN's RATE_LIMIT code (or "too many requests").
+    Successful output is never scanned as text: prices, timestamps and addresses often contain
+    the digits 429, which used to trigger false bans."""
+    stderr, stdout = out.stderr or "", out.stdout or ""
+    body = stderr
+    try:
+        d = json.loads(stdout) if stdout.strip() else None
+    except json.JSONDecodeError:
+        d = None
+    if isinstance(d, dict):
+        code = d.get("code")
+        if code not in (0, None, "0"):              # an error payload: inspect its code/message only
+            body += f" {code} {d.get('msg') or ''} {d.get('message') or ''} {d.get('error') or ''}"
+    elif out.returncode != 0:
+        body += stdout[:2000]                       # non-JSON error output
+    if not (_RL_429.search(body) and _RL_MARK.search(body)):
+        return None
+    m = re.search(r"~?(\d+)\s*s(?:ec(?:onds)?)?\s*remaining", body, re.I) or \
+        re.search(r"(?:retry|reset)\D{0,20}(\d+)", body, re.I)
+    return min(int(m.group(1)), 3600) if m else 300
 
 
 def _f(v, d=0.0):
