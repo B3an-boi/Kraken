@@ -1,0 +1,54 @@
+# When you publish a GitHub Release, this builds the download ZIP, attaches it to the release,
+# scans it on VirusTotal, and adds the scan link + SHA-256 to the release notes.
+# VirusTotal upload: optional. With a free API key saved as the repository secret VT_API_KEY
+# (Settings → Secrets and variables → Actions) the ZIP is uploaded automatically. Without it,
+# upload the ZIP once at https://www.virustotal.com after publishing; the link in the notes then works.
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    env:
+      VT_API_KEY: ${{ secrets.VT_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ZIP
+        id: zip
+        run: |
+          NAME="kraken-${GITHUB_REF_NAME}.zip"
+          git archive --format=zip --prefix=kraken/ -o "$NAME" HEAD
+          sha256sum "$NAME" | tee SHA256SUMS.txt
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "sha=$(sha256sum "$NAME" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Attach ZIP to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.zip.outputs.name }}" SHA256SUMS.txt --clobber
+
+      - name: Scan on VirusTotal
+        if: ${{ env.VT_API_KEY != '' }}
+        uses: crazy-max/ghaction-virustotal@v4
+        with:
+          vt_api_key: ${{ secrets.VT_API_KEY }}
+          files: ${{ steps.zip.outputs.name }}
+          update_release_body: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add SHA-256 and VirusTotal file link to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHA="${{ steps.zip.outputs.sha }}"
+          BODY="$(gh release view "$GITHUB_REF_NAME" --json body -q .body)"
+          printf '%s\n\n---\n**Download:** `%s`  \n**SHA-256:** `%s`  \n**VirusTotal report:** https://www.virustotal.com/gui/file/%s\n\n<sub>The report link matches this exact file by its SHA-256. You can verify it yourself: drop the ZIP on virustotal.com and the same report opens.</sub>\n' \
+            "$BODY" "${{ steps.zip.outputs.name }}" "$SHA" "$SHA" > notes.md
+          gh release edit "$GITHUB_REF_NAME" --notes-file notes.md

@@ -8,6 +8,10 @@ Find coins resting in a quiet floor after their first pump, before the breakout.
 
 Runs on your own computer · uses your own GMGN API key · keys never leave your machine · paper trading by default
 
+[![Download](https://img.shields.io/github/v/release/B3an-boi/Kraken?label=Download&style=for-the-badge&color=3ef0c6)](https://github.com/B3an-boi/Kraken/releases/latest)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-scanned-394EFF?style=for-the-badge&logo=virustotal&logoColor=white)](https://github.com/B3an-boi/Kraken/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+
 </div>
 
 ---
@@ -68,6 +72,9 @@ More detail: **[How it works](docs/how-it-works.md)** · **[Settings reference](
 ---
 
 ## Safety
+
+> **Is the download safe?** Every release ZIP is scanned on VirusTotal automatically. Open the [latest release](https://github.com/B3an-boi/Kraken/releases/latest) to see its **VirusTotal report** link and **SHA-256** fingerprint. kraken is plain, readable Python and JavaScript with no .exe files, so you can also read every line yourself.
+
 
 - **Local only.** The server binds to `127.0.0.1` and rejects API requests from other machines.
 - **Keys stay on your computer** in gmgn-cli's own env file (`~/.config/gmgn/.env`). kraken never sends them anywhere except to gmgn-cli.
