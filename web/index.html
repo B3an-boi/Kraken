@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>kraken</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐙</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --abyss:#060b14;--deep:#0b1422;--panel:#101b2d;--raise:#16243a;--line:#1f3150;--line2:#2a4268;
+  --text:#dfe8f5;--dim:#7d90ad;--faint:#4f6382;
+  --glow:#3ef0c6;--glow2:#2bb8ff;--coral:#ff6b6b;--amber:#ffc15e;--violet:#a98bff;
+  --sans:'Space Grotesk',system-ui,-apple-system,Segoe UI,sans-serif;--mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+  --r:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--abyss);color:var(--text);font-family:var(--sans);font-size:14px}
+body{background:radial-gradient(1200px 600px at 80% -10%,#0f2a3f55,transparent),radial-gradient(900px 500px at -10% 110%,#13204a55,transparent),var(--abyss);min-height:100vh}
+a{color:var(--glow2)}
+button{font-family:inherit}
+.mono{font-family:var(--mono)}
+header{position:sticky;top:0;z-index:20;background:#060b14e6;backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:14px;padding:10px 18px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:19px;letter-spacing:-.02em}
+.logo b{color:var(--glow)}
+.logo small{font-family:var(--mono);font-size:10px;color:var(--faint);font-weight:400}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;border:1px solid var(--line2);font-size:11px;font-family:var(--mono);color:var(--dim);white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.pill.live .dot{background:var(--glow);box-shadow:0 0 8px var(--glow)}
+.pill.demo .dot{background:var(--amber)}
+.pill.real{border-color:var(--coral);color:var(--coral)}
+.pill.real .dot{background:var(--coral);box-shadow:0 0 8px var(--coral)}
+.spacer{flex:1}
+.modebtn{cursor:pointer;background:transparent}
+.modebtn:hover{border-color:var(--glow)}
+select.chain{background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:5px 8px;font-family:var(--mono);font-size:12px}
+nav{display:flex;gap:2px;padding:0 12px;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{background:none;border:none;color:var(--dim);padding:10px 14px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav button:hover{color:var(--text)}
+nav button.on{color:var(--glow);border-bottom-color:var(--glow)}
+nav .badge{font-family:var(--mono);font-size:10px;background:var(--raise);border-radius:99px;padding:1px 6px;margin-left:4px;color:var(--text)}
+main{padding:18px;max-width:1400px;margin:0 auto}
+.view{display:none}.view.on{display:block}
+.card{background:linear-gradient(180deg,var(--panel),var(--deep));border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h3{margin:0 0 4px;font-size:15px;letter-spacing:-.01em}
+.sub{color:var(--dim);font-size:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile .k{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.tile .v{font-family:var(--mono);font-size:20px;margin-top:4px}
+.tile .s{font-size:11px;color:var(--faint);margin-top:2px}
+.btn{background:var(--raise);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--glow);color:var(--glow)}
+.btn.primary{background:var(--glow);color:#03241c;border-color:var(--glow);font-weight:600}
+.btn.primary:hover{filter:brightness(1.1);color:#03241c}
+.btn.small{padding:5px 10px;font-size:12px}
+.btn.danger{border-color:#ff6b6b66;color:var(--coral)}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.status{font-size:12px;color:var(--dim);font-family:var(--mono)}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);cursor:pointer;user-select:none}
+.chk input{accent-color:var(--glow)}
+.funnel{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-family:var(--mono);font-size:12px;margin-bottom:12px}
+.funnel span{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 9px}
+.funnel span b{color:var(--glow);font-weight:500}
+.funnel i{color:var(--faint);font-style:normal}
+.whys{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.why{font-size:11px;font-family:var(--mono);color:var(--amber);background:#ffc15e12;border:1px solid #ffc15e33;border-radius:6px;padding:2px 8px}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--deep)}
+.tbl th{text-align:left;font-weight:500;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--deep)}
+.tbl td{padding:9px 12px;border-bottom:1px solid #1f315066;white-space:nowrap}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:#16243a66}
+.tbl tr.dim td{opacity:.5}
+.num{font-family:var(--mono);text-align:right}
+.tok{display:flex;flex-direction:column}
+.tok b{font-weight:600}
+.tok a{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-decoration:none}
+.tok a:hover{color:var(--glow2)}
+.up{color:var(--glow)}.down{color:var(--coral)}
+.scorebar{display:flex;align-items:center;gap:8px;min-width:110px}
+.scorebar .b{flex:1;height:6px;background:var(--raise);border-radius:3px;overflow:hidden}
+.scorebar .b i{display:block;height:100%;background:linear-gradient(90deg,var(--glow2),var(--glow))}
+.scorebar span{font-family:var(--mono);width:24px;text-align:right}
+.tag{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:5px;background:var(--raise);color:var(--dim);margin:1px 2px 1px 0}
+.tag.bad{background:#ff6b6b1a;color:var(--coral)}
+.tag.good{background:#3ef0c61a;color:var(--glow)}
+.tag.warn{background:#ffc15e1a;color:var(--amber)}
+.hcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.hc{background:linear-gradient(180deg,var(--panel),var(--deep));border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.hc:hover{border-color:var(--line2)}
+.hc .head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.hc .score{font-family:var(--mono);font-size:24px;font-weight:500;color:var(--glow);line-height:1}
+.hc .score small{display:block;font-size:10px;color:var(--faint);text-align:right;margin-top:3px}
+.hc svg{width:100%;height:92px;display:block;background:#060b1488;border-radius:8px}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kv div{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.kv b{display:block;font-family:var(--mono);font-size:12.5px;color:var(--text);font-weight:400;text-transform:none;letter-spacing:0;margin-top:2px}
+.hc .acts{display:flex;gap:8px;align-items:center}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
+.f label{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+.f input,.f select{width:100%;background:var(--abyss);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;font-family:var(--mono);font-size:12.5px}
+.f input:focus,.f select:focus{outline:none;border-color:var(--glow)}
+.f input.changed,.f select.changed{border-color:var(--amber)}
+.f small{display:block;font-size:10.5px;color:var(--faint);margin-top:4px;line-height:1.35}
+.f.wide{grid-column:1/-1}
+.savebar{position:sticky;bottom:12px;margin-top:16px;display:none;justify-content:space-between;align-items:center;gap:12px;background:var(--raise);border:1px solid var(--amber);border-radius:var(--r);padding:10px 14px}
+.savebar.on{display:flex}
+.empty{padding:40px 20px;text-align:center;color:var(--dim)}
+.empty .big{font-size:34px;margin-bottom:8px}
+.banner{border:1px solid #ffc15e55;background:#ffc15e10;color:var(--amber);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px;display:none}
+.banner.on{display:block}
+.banner.red{border-color:#ff6b6b66;background:#ff6b6b12;color:var(--coral)}
+.progress{height:8px;background:var(--raise);border-radius:4px;overflow:hidden;margin:8px 0 4px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--glow))}
+.bars .br{display:grid;grid-template-columns:110px 1fr 80px;gap:10px;align-items:center;font-size:12px;margin:5px 0;font-family:var(--mono)}
+.bars .br .t{height:10px;background:var(--raise);border-radius:5px;overflow:hidden}
+.bars .br .t i{display:block;height:100%;background:var(--glow2)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.log{font-family:var(--mono);font-size:12px}
+.log div{padding:6px 0;border-bottom:1px solid #1f315066;display:flex;gap:10px}
+.log time{color:var(--faint);flex:none}
+.log .kind{flex:none;width:86px;color:var(--glow2)}
+.log .kind.error{color:var(--coral)}.log .kind.exit_signal{color:var(--amber)}.log .kind.buy,.log .kind.sell{color:var(--glow)}
+#toast{position:fixed;right:16px;bottom:16px;z-index:50;display:flex;flex-direction:column;gap:8px}
+#toast div{background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--glow);border-radius:8px;padding:10px 14px;font-size:13px;max-width:360px;box-shadow:0 8px 30px #0008;animation:in .2s}
+#toast div.err{border-left-color:var(--coral)}
+@keyframes in{from{transform:translateY(8px);opacity:0}}
+.spin{display:inline-block;width:10px;height:10px;border:2px solid var(--glow);border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
+@keyframes sp{to{transform:rotate(360deg)}}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:14px;padding:22px;max-width:440px}
+dialog::backdrop{background:#000a}
+@media (max-width:760px){
+  main{padding:12px}.two{grid-template-columns:1fr}.top{padding:8px 12px;gap:8px}
+  .hcards{grid-template-columns:1fr}.logo small{display:none}.hide-sm{display:none}
+  .bars .br{grid-template-columns:90px 1fr 70px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="logo">🐙 <span><b>kraken</b></span><small id="ver"></small></div>
+    <span class="pill" id="srcPill"><span class="dot"></span><span id="srcTxt">connecting…</span></span>
+    <div class="spacer"></div>
+    <span class="pill hide-sm" id="posPill">0 open</span>
+    <select class="chain" id="chainSel" title="Chain"><option value="sol">SOL</option><option value="bsc">BSC</option><option value="base">BASE</option><option value="eth">ETH</option></select>
+    <button class="pill modebtn" id="modeBtn" title="Switch paper / real trading"><span class="dot"></span><span id="modeTxt">SHADOW</span></button>
+  </div>
+  <nav id="nav">
+    <button data-v="hunter" class="on">Base Hunter<span class="badge" id="bHunter">0</span></button>
+    <button data-v="screen">Screener<span class="badge" id="bScreen">0</span></button>
+    <button data-v="positions">Positions<span class="badge" id="bPos">0</span></button>
+    <button data-v="learn">Learning</button>
+    <button data-v="activity">Activity</button>
+    <button data-v="settings">Settings</button>
+  </nav>
+</header>
+<main>
+  <div class="banner" id="demoBanner">You're on <b>demo data</b>: a simulated market so you can explore everything safely. To use real data, add your GMGN API key with <span class="mono">python -m kraken setup</span>, then restart kraken.</div>
+  <div class="banner red" id="liveBanner"><b>LIVE trading is on.</b> Buy and Sell send real swaps with real funds. Switch back to SHADOW (top right) to paper trade.</div>
+  <section class="view on" id="v-hunter">
+    <div class="toolbar">
+      <button class="btn primary" id="hScan">Scan now</button>
+      <label class="chk"><input type="checkbox" id="hAuto"> Auto-scan</label>
+      <select class="chain" id="hSetup" title="Setup"><option value="floor">Post-pump floor</option><option value="any">Any tight range</option></select>
+      <span class="status" id="hStatus"></span>
+    </div>
+    <div class="funnel" id="hFunnel"></div>
+    <div class="whys" id="hWhy"></div>
+    <div class="hcards" id="hCards"></div>
+  </section>
+  <section class="view" id="v-screen">
+    <div class="toolbar">
+      <button class="btn primary" id="sRun">Run screen</button>
+      <label class="chk"><input type="checkbox" id="sAuto"> Auto-screen</label>
+      <label class="chk"><input type="checkbox" id="sRej" checked> Show rejected</label>
+      <span class="status" id="sStatus"></span>
+    </div>
+    <div class="funnel" id="sFunnel"></div>
+    <div class="tblwrap"><table class="tbl" id="sTbl"></table></div>
+  </section>
+  <section class="view" id="v-positions">
+    <div class="tiles" id="pTiles"></div>
+    <div class="card" style="margin-bottom:14px"><h3>Open positions</h3><div class="sub" style="margin-bottom:10px">Prices refresh in the background. Exit signals send an alert; kraken never sells on its own.</div><div class="tblwrap"><table class="tbl" id="pOpen"></table></div></div>
+    <div class="card"><h3>Closed</h3><div class="tblwrap" style="margin-top:10px"><table class="tbl" id="pClosed"></table></div></div>
+  </section>
+  <section class="view" id="v-learn">
+    <div class="tiles" id="lTiles"></div>
+    <div class="card" style="margin-bottom:14px">
+      <h3>Model progress</h3>
+      <div class="progress"><i id="lProg"></i></div>
+      <div class="sub" id="lProgTxt"></div>
+      <div id="lWeights" class="bars" style="margin-top:10px"></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h3>What-if backtest</h3>
+      <div class="sub">Filter your labeled snapshots to see how stricter or looser settings would have done. Changing take-profit or stop-loss gives an approximate result.</div>
+      <div class="fields" id="btForm"></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="btRun">Run backtest</button><button class="btn" id="btClear">Clear filters</button><span class="status" id="btRes"></span></div>
+      <div class="two" id="btBuckets" style="margin-top:14px"></div>
+    </div>
+    <div class="card"><h3>Recent outcomes</h3><div class="tblwrap" style="margin-top:10px"><table class="tbl" id="lRecent"></table></div></div>
+  </section>
+  <section class="view" id="v-activity">
+    <div class="two">
+      <div class="card"><h3>Event log</h3><div class="log" id="aLog"></div></div>
+      <div class="card"><h3>Alerts sent</h3><div class="log" id="aAlerts"></div></div>
+    </div>
+  </section>
+  <section class="view" id="v-settings">
+    <div class="card" style="margin-bottom:14px" id="keyCard"></div>
+    <div class="sgrid" id="setGrid"></div>
+    <div class="savebar" id="saveBar"><span>Unsaved changes</span><div class="row"><button class="btn" id="setUndo">Undo</button><button class="btn primary" id="setSave">Save settings</button></div></div>
+  </section>
+</main>
+<dialog id="dlg"><h3 id="dlgT" style="margin-top:0"></h3><p id="dlgB" class="sub" style="font-size:13px;line-height:1.5"></p><div class="row" style="justify-content:flex-end"><button class="btn" id="dlgNo">Cancel</button><button class="btn primary" id="dlgYes">Confirm</button></div></dialog>
+<div id="toast"></div>
+<script src="/assets/app.js"></script>
+</body>
+</html>
