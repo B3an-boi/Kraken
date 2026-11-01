@@ -8,17 +8,21 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, backtest, screener, setup_flow
+from . import __version__, backtest, graph, research, screener, setup_flow
 from .alerts import Alerts
 from .config import DATA, ROOT, Settings
-from .gmgn import DemoClient, GMGNError, LiveClient, RateGate, key_status
+from .gmgn import NATIVE, DemoClient, GMGNError, LiveClient, RateGate, key_status
 from .hunter import Hunter
-from .positions import Positions, RiskError
+from .positions import PaperOrders, Positions, RiskError
 
 S = Settings()
 GATE = RateGate(S["rate"]["min_gap_s"], S["rate"]["max_inflight"])
 HUNTER = Hunter(S)
 POS = Positions(S)
+ORDERS = PaperOrders(POS)
+WATCH = research.Watchlist()
+TAPE = research.Tape()
+JOBS = research.Jobs()
 ALERTS = Alerts(S)
 SCREEN = dict(results=[], funnel={}, ts=0.0, running=False, error="")
 EVENTS: deque = deque(maxlen=300)
@@ -44,8 +48,9 @@ def is_live() -> bool:
     return not FORCE_DEMO and k["cli"] and k["api_key"]
 
 
-def client():
-    chain = S["chain"]
+def client(chain: str | None = None):
+    """GMGN client for `chain` (default: the chain selected in the UI). One cached client per chain."""
+    chain = chain or S["chain"]
     key = (chain, is_live())
     with _lock:
         if key not in _clients:
@@ -65,7 +70,10 @@ async def local_only(request: Request, call_next):
         local = host in ("localhost", "testclient")
     if not local and not ALLOW_REMOTE and request.url.path.startswith("/api/"):
         return JSONResponse({"detail": "kraken only accepts requests from this computer"}, status_code=403)
-    return await call_next(request)
+    resp = await call_next(request)
+    if request.url.path.startswith("/assets/") or request.url.path == "/":
+        resp.headers["Cache-Control"] = "no-cache"      # updates show up on the next page load
+    return resp
 
 
 def _err(e: Exception):
@@ -200,6 +208,8 @@ class BuyIn(BaseModel):
     symbol: str = "?"
     size: float | None = None
     source: str = "manual"
+    take_profit: float | None = None
+    stop_loss: float | None = None
 
 
 class SellIn(BaseModel):
@@ -216,7 +226,8 @@ def get_positions():
 @app.post("/api/buy")
 def buy(b: BuyIn):
     try:
-        p = POS.buy(client(), b.address.strip(), screener.clean_symbol(b.symbol), b.size, b.source)
+        p = POS.buy(client(), b.address.strip(), screener.clean_symbol(b.symbol), b.size, b.source,
+                    take_profit=b.take_profit, stop_loss=b.stop_loss)
     except Exception as e:
         _err(e)
     event("buy", f"{p['mode']} buy {p['symbol']} {p['size']} @ {p['entry_price']:.3g}", id=p["id"])
@@ -226,11 +237,218 @@ def buy(b: BuyIn):
 @app.post("/api/sell")
 def sell(s: SellIn):
     try:
-        p = POS.sell(client(), s.id, s.reason)
+        pos = next((x for x in POS.items if x["id"] == s.id), None)
+        p = POS.sell(client(pos["chain"] if pos else None), s.id, s.reason)
     except Exception as e:
         _err(e)
     event("sell", f"{p['mode']} sell {p['symbol']} {p['pnl_pct']:+.1%}", id=p["id"])
     return p
+
+
+# ── command center: discover, research, tape, watchlist, orders ────────────────
+def _chain():
+    return S["chain"]
+
+
+def _addr_chain(addr: str, follow=True) -> str:
+    """The chain an address can live on: base58 = Solana, 0x = an EVM chain (the selected one if it's EVM,
+    otherwise BSC). With follow=True the UI's chain switches to match, so every screen stays consistent."""
+    cur = S["chain"]
+    ch = "sol" if research.SOL_ADDR.match(addr) else (cur if cur != "sol" else "bsc")
+    if follow and ch != cur:
+        S.update({"chain": ch})
+        event("chain", f"switched to {ch.upper()} to match {addr[:6]}…")
+    return ch
+
+
+@app.get("/api/discover")
+def get_discover(force: bool = False):
+    c = client()
+    if not c.live:
+        raise HTTPException(400, "Discover needs live GMGN data. Connect your GMGN key in Settings.")
+    return research.discover(c, _chain(), force)
+
+
+@app.get("/api/search")
+def get_search(q: str):
+    c = client()
+    if not c.live:
+        raise HTTPException(400, "Research needs live GMGN data. Connect your GMGN key in Settings.")
+    try:
+        r = research.search(c, _chain(), q, client_for=client)
+    except Exception as e:
+        _err(e)
+    if r.get("chain") and r["chain"] != _chain():
+        S.update({"chain": r["chain"]})                     # the address lives on another chain: follow it
+        event("chain", f"switched to {r['chain'].upper()} for {q[:12]}…")
+    return r
+
+
+@app.get("/api/token/{address}")
+def get_token(address: str, force: bool = False):
+    c = client()
+    if not c.live:
+        raise HTTPException(400, "Research needs live GMGN data. Connect your GMGN key in Settings.")
+    if not research.is_address(address):
+        raise HTTPException(400, "that's not a contract address")
+    try:
+        ch = _addr_chain(address)
+        return research.token_dossier(client(ch), ch, address, force)
+    except Exception as e:
+        _err(e)
+
+
+@app.get("/api/candles/{address}")
+def get_candles(address: str, res: str = "15m"):
+    if not research.is_address(address):
+        raise HTTPException(400, "that's not a contract address")
+    ch = _addr_chain(address, follow=False)
+    c = client(ch)
+    if not c.live:
+        raise HTTPException(400, "Charts need live GMGN data.")
+    try:
+        return research.candles(c, ch, address, res)
+    except Exception as e:
+        _err(e)
+
+
+@app.get("/api/wallet/{address}")
+def get_wallet(address: str, force: bool = False):
+    c = client()
+    if not c.live:
+        raise HTTPException(400, "Research needs live GMGN data. Connect your GMGN key in Settings.")
+    if not research.is_address(address):
+        raise HTTPException(400, "that's not a wallet address")
+    try:
+        ch = _addr_chain(address)
+        d = research.wallet_dossier(client(ch), ch, address, force)
+    except Exception as e:
+        _err(e)
+    d["following"] = any(w["address"] == address for w in WATCH.wallets())
+    return d
+
+
+@app.get("/api/graph/{address}")
+def get_graph(address: str):
+    c = client()
+    if not c.live:
+        raise HTTPException(400, "The wallet graph needs live GMGN data. Connect your GMGN key in Settings.")
+    if not research.is_address(address):
+        raise HTTPException(400, "that's not a wallet address")
+    try:
+        ch = _addr_chain(address, follow=False)
+        return graph.build(client(ch), ch, address)
+    except Exception as e:
+        _err(e)
+
+
+class JobIn(BaseModel):
+    kind: str
+    target: str
+
+
+@app.post("/api/jobs")
+def start_job(j: JobIn):
+    if not client().live:
+        raise HTTPException(400, "needs live GMGN data")
+    try:
+        t = j.target.strip()
+        return JOBS.start(j.kind, _addr_chain(t, follow=False), t)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/jobs")
+def get_job(kind: str, target: str):
+    return JOBS.get(kind, _addr_chain(target, follow=False), target) or dict(status="none")
+
+
+@app.get("/api/tape")
+def get_tape(kinds: str = ""):
+    k = [x for x in kinds.split(",") if x] or None
+    return dict(trades=TAPE.list(k, chain=_chain()), following=WATCH.wallets())
+
+
+class WatchIn(BaseModel):
+    address: str
+    label: str = ""
+
+
+@app.post("/api/watchlist")
+def add_watch(w: WatchIn):
+    try:
+        return dict(wallets=WATCH.add(w.address.strip(), w.label))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/watchlist/remove")
+def remove_watch(w: WatchIn):
+    return dict(wallets=WATCH.remove(w.address.strip()))
+
+
+class OrderIn(BaseModel):
+    address: str
+    symbol: str = "?"
+    type: str                 # buy_low / buy_high / take_profit / stop_loss
+    trigger_price: float
+    size: float | None = None
+    expire_hours: float = 24
+
+
+@app.get("/api/orders")
+def get_orders():
+    out = dict(paper=ORDERS.open_list(), live=[], live_error=None, mode=S["mode"])
+    c = client()
+    if c.live and key_status()["private_key"]:
+        try:
+            out["live"] = c.limit_orders("open")
+        except Exception as e:
+            out["live_error"] = str(e)[:200]
+    return out
+
+
+@app.post("/api/orders")
+def create_order(o: OrderIn):
+    if o.type not in ("buy_low", "buy_high", "take_profit", "stop_loss"):
+        raise HTTPException(400, "unknown order type")
+    if not (0 < o.expire_hours <= 24 * 30):
+        raise HTTPException(400, "expiry must be between 0 and 30 days")
+    c = client()
+    try:
+        if S["mode"] == "LIVE":
+            if not c.live or not key_status()["private_key"]:
+                raise RiskError("LIVE orders need a connected GMGN key with a wallet")
+            if o.type.startswith("buy"):
+                native, dec = NATIVE[_chain()]
+                r = c.limit_order(o.address, o.type, o.trigger_price, amount_in=float(o.size or S["risk"]["buy_size"]) * 10 ** dec,
+                                  slippage=S["risk"]["slippage"], expire_s=o.expire_hours * 3600)
+            else:
+                r = c.limit_order(o.address, o.type, o.trigger_price, amount_pct=100,
+                                  slippage=S["risk"]["slippage"], expire_s=o.expire_hours * 3600)
+            event("order", f"LIVE {o.type.replace('_', ' ')} order on {screener.clean_symbol(o.symbol)} at {o.trigger_price:.6g}")
+            return dict(mode="LIVE", result=r)
+        p = ORDERS.create(o.address, screener.clean_symbol(o.symbol), o.type, o.trigger_price, o.size, o.expire_hours * 3600,
+                          chain=_chain())
+        event("order", f"paper {o.type.replace('_', ' ')} order on {p['symbol']} at {o.trigger_price:.6g}")
+        return dict(mode="SHADOW", result=p)
+    except Exception as e:
+        _err(e)
+
+
+class CancelIn(BaseModel):
+    id: str
+    live: bool = False
+
+
+@app.post("/api/orders/cancel")
+def cancel_order(cn: CancelIn):
+    try:
+        if cn.live:
+            return dict(result=client().cancel_order(cn.id))
+        return dict(result=ORDERS.cancel(cn.id))
+    except Exception as e:
+        _err(e)
 
 
 # ── first-run GMGN setup ─────────────────────────────────────────────────────
@@ -290,7 +508,21 @@ def loop():
             c = client()
             if now - last["flow"] >= 60:
                 last["flow"] = now
-                HUNTER.poll_flow(c)
+                HUNTER.poll_flow(c, TAPE, chain=S["chain"])
+            if c.live and WATCH.wallets() and now - last.get("watch", 0) >= 120:
+                last["watch"] = now
+                for w in WATCH.wallets():
+                    try:
+                        d = c.read(["portfolio", "activity", "--wallet", w["address"], "--limit", "10"])
+                        for a in (d or {}).get("activities") or []:
+                            if a.get("event_type") in ("buy", "sell"):
+                                TAPE.add("follow", a, w.get("label") or w["address"][:6], chain=S["chain"])
+                    except Exception:
+                        pass
+            if ORDERS.open_list() and now - last.get("orders", 0) >= 20:
+                last["orders"] = now
+                for o in ORDERS.check(client):
+                    event("order", f"paper {o['type'].replace('_', ' ')} filled on {o['symbol']} at {o['fill_price']:.6g}")
             if now - last["label"] >= 120:
                 last["label"] = now
                 n = HUNTER.label_due(c)
@@ -306,7 +538,10 @@ def loop():
                 _run_screen()
             if POS.open_list() and now - last["monitor"] >= S["risk"]["monitor_every_s"]:
                 last["monitor"] = now
-                for sig in POS.monitor(c):
+                sigs = []
+                for ch in {p["chain"] for p in POS.open_list()}:      # each position is priced on its own chain
+                    sigs += POS.monitor(client(ch), chain=ch)
+                for sig in sigs:
                     p = sig["position"]
                     event("exit_signal", f"{p['symbol']}: {sig['msg']}", id=p["id"])
                     if S["alerts"]["on_exit"]:

@@ -49,9 +49,14 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { Say "Node.js was ins
 Say "[2/5] Node.js ready" Green
 
 # 3. gmgn-cli (GMGN's official command-line tool)
-if (-not (Get-Command gmgn-cli -ErrorAction SilentlyContinue)) {
-    Say "Installing gmgn-cli..." Cyan
-    npm install -g gmgn-cli
+$needCli = -not (Get-Command gmgn-cli -ErrorAction SilentlyContinue)
+if (-not $needCli) {
+    # kraken needs gmgn-cli 1.7+ (call-outs, name search). Update older installs.
+    try { $v = [version](((gmgn-cli --version) 2>$null | Select-String -Pattern '\d+\.\d+\.\d+').Matches[0].Value) } catch { $v = [version]"0.0.0" }
+    if ($v -lt [version]"1.7.0") { Say "Updating gmgn-cli ($v -> latest)..." Cyan; $needCli = $true }
+}
+if ($needCli) {
+    npm install -g gmgn-cli@latest
     Refresh-Path
 }
 Say "[3/5] gmgn-cli ready" Green

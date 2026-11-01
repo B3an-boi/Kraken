@@ -6,6 +6,7 @@ from .config import DATA
 from .gmgn import NATIVE, GMGNError, key_status
 
 PATH = DATA / "positions.json"
+ORDERS_PATH = DATA / "paper_orders.json"
 
 
 class RiskError(ValueError):
@@ -74,13 +75,22 @@ class Positions:
         return dict(order_id=oid, status=status, hash=order.get("hash"),
                     filled=status in ("confirmed", "processed", "successful"))
 
-    def buy(self, client, address: str, symbol: str, size: float | None = None, source: str = "manual") -> dict:
+    def buy(self, client, address: str, symbol: str, size: float | None = None, source: str = "manual",
+            take_profit: float | None = None, stop_loss: float | None = None, paper: bool = False,
+            chain: str | None = None) -> dict:
+        """take_profit / stop_loss are fractions (1.0 = +100%, 0.5 = -50%). LIVE: attached to the swap as
+        GMGN server-side orders. SHADOW: kraken closes the paper position itself when they trigger."""
         size = float(size or self.settings["risk"]["buy_size"])
+        for v in (take_profit, stop_loss):
+            if v is not None and not (0 < v <= 100):
+                raise RiskError("take-profit / stop-loss must be a positive percent")
+        if stop_loss is not None and stop_loss >= 1:
+            raise RiskError("stop-loss must be under 100%")
         if size <= 0:
             raise RiskError("size must be positive")
         with self.lock:
             self._check_risk(size, address)
-            live = self._live(client)
+            live = False if paper else self._live(client)   # paper orders never become real trades
             price = client.price(address)
             if not price:
                 raise RiskError("couldn't get a price for this token")
@@ -89,14 +99,16 @@ class Positions:
                 chain = self.settings["chain"]
                 native, dec = NATIVE[chain]
                 fill = self._await_fill(client, client.swap(native, address, amount=size * 10 ** dec,
-                                                            slippage=self.settings["risk"]["slippage"]))
+                                                            slippage=self.settings["risk"]["slippage"],
+                                                            take_profit=take_profit, stop_loss=stop_loss))
                 if not fill["filled"]:
                     raise RiskError(f"swap not confirmed (status {fill['status']}) — no position recorded")
                 price = client.price(address) or price
-            p = dict(id=uuid.uuid4().hex[:10], address=address, symbol=symbol, chain=self.settings["chain"],
+            p = dict(id=uuid.uuid4().hex[:10], address=address, symbol=symbol, chain=chain or self.settings["chain"],
                      mode="LIVE" if live else "SHADOW", size=size, entry_price=price, entry_ts=time.time(),
                      last_price=price, peak=price, pnl=0.0, pnl_pct=0.0, status="open", source=source,
-                     order_id=fill["order_id"], tx=fill["hash"], signals=[], entry_top10=None)
+                     order_id=fill["order_id"], tx=fill["hash"], signals=[], entry_top10=None,
+                     tp=take_profit, sl=stop_loss)
             self.items.append(p)
             self._save()
             return p
@@ -121,12 +133,14 @@ class Positions:
             self._save()
             return p
 
-    def monitor(self, client) -> list[dict]:
-        """Update prices and return newly raised exit signals."""
+    def monitor(self, client, chain: str | None = None) -> list[dict]:
+        """Update prices (for positions on `chain`) and return newly raised exit signals."""
         r = self.settings["risk"]
         new = []
         with self.lock:
             for p in self.open_list():
+                if chain and p.get("chain", "sol") != chain:
+                    continue
                 try:
                     price = client.price(p["address"])
                 except Exception:
@@ -136,10 +150,19 @@ class Positions:
                 p.update(last_price=price, peak=max(p["peak"], price), pnl_pct=price / p["entry_price"] - 1,
                          pnl=p["size"] * (price / p["entry_price"] - 1), updated=time.time())
                 sig = []
-                if p["pnl_pct"] <= -r["stop_loss"]:
-                    sig.append(("stop_loss", f"down {p['pnl_pct']:.0%} (stop {r['stop_loss']:.0%})"))
-                if p["pnl_pct"] >= r["take_profit"]:
-                    sig.append(("take_profit", f"up {p['pnl_pct']:.0%} (target {r['take_profit']:.0%})"))
+                # paper positions with their own TP/SL close themselves, like GMGN's server-side orders do
+                if p["mode"] == "SHADOW" and (p.get("tp") or p.get("sl")):
+                    hit = ("take_profit" if p.get("tp") and p["pnl_pct"] >= p["tp"] else
+                           "stop_loss" if p.get("sl") and p["pnl_pct"] <= -p["sl"] else None)
+                    if hit:
+                        p.update(status="closed", exit_price=price, exit_ts=time.time(), exit_reason=hit.replace("_", "-"))
+                        new.append(dict(position=p, kind=hit, msg=f"paper {hit.replace('_', '-')} filled at {p['pnl_pct']:+.0%}", ts=time.time()))
+                        continue
+                sl, tp = p.get("sl") or r["stop_loss"], p.get("tp") or r["take_profit"]
+                if p["pnl_pct"] <= -sl:
+                    sig.append(("stop_loss", f"down {p['pnl_pct']:.0%} (stop {sl:.0%})"))
+                if p["pnl_pct"] >= tp:
+                    sig.append(("take_profit", f"up {p['pnl_pct']:.0%} (target {tp:.0%})"))
                 if r["exit_on_safety_drop"]:
                     try:
                         sec = client.security(p["address"])
@@ -160,3 +183,84 @@ class Positions:
                         new.append(dict(position=p, **s))
             self._save()
         return new
+
+
+class PaperOrders:
+    """Limit orders in SHADOW mode: stored locally, filled by the monitor loop when the price crosses.
+    buy_low fills at or below the trigger, buy_high at or above; take_profit / stop_loss close a position."""
+    def __init__(self, positions: "Positions"):
+        self.pos = positions
+        self.lock = threading.RLock()
+        try:
+            self.items = json.loads(ORDERS_PATH.read_text(encoding="utf-8")) if ORDERS_PATH.exists() else []
+        except Exception:
+            self.items = []
+
+    def _save(self):
+        tmp = ORDERS_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.items, indent=1), encoding="utf-8")
+        tmp.replace(ORDERS_PATH)
+
+    def create(self, address, symbol, side_type, trigger_price, size=None, expire_s=86400, chain="sol") -> dict:
+        if side_type not in ("buy_low", "buy_high", "take_profit", "stop_loss"):
+            raise RiskError("unknown order type")
+        if not trigger_price or trigger_price <= 0:
+            raise RiskError("trigger price must be positive")
+        if side_type in ("take_profit", "stop_loss") and not any(p["address"] == address for p in self.pos.open_list()):
+            raise RiskError("you don't hold this token, so there's nothing to sell")
+        o = dict(id=uuid.uuid4().hex[:10], address=address, symbol=symbol, type=side_type, trigger=float(trigger_price),
+                 size=float(size or self.pos.settings["risk"]["buy_size"]), created=time.time(),
+                 expires=time.time() + expire_s, status="open", mode="SHADOW", chain=chain)
+        with self.lock:
+            self.items.append(o)
+            self._save()
+        return o
+
+    def cancel(self, oid) -> dict:
+        with self.lock:
+            o = next((x for x in self.items if x["id"] == oid and x["status"] == "open"), None)
+            if not o:
+                raise RiskError("order not found or already done")
+            o["status"] = "cancelled"
+            self._save()
+            return o
+
+    def open_list(self):
+        return [o for o in self.items if o["status"] == "open"]
+
+    def check(self, client_for) -> list[dict]:
+        """client_for(chain) -> GMGN client; every order is priced and filled on its own chain."""
+        done = []
+        with self.lock:
+            for o in self.open_list():
+                if time.time() > o["expires"]:
+                    o["status"] = "expired"
+                    continue
+                client = client_for(o.get("chain", "sol"))
+                try:
+                    px = client.price(o["address"])
+                except Exception:
+                    continue
+                if not px:
+                    continue
+                hit = ((o["type"] == "buy_low" and px <= o["trigger"]) or (o["type"] == "buy_high" and px >= o["trigger"]) or
+                       (o["type"] == "take_profit" and px >= o["trigger"]) or (o["type"] == "stop_loss" and px <= o["trigger"]))
+                if not hit:
+                    continue
+                try:
+                    if o["type"].startswith("buy"):
+                        self.pos.buy(client, o["address"], o["symbol"], o["size"], source="limit order", paper=True,
+                                     chain=o.get("chain", "sol"))
+                    else:
+                        p = next((x for x in self.pos.open_list() if x["address"] == o["address"]), None)
+                        if not p:
+                            o["status"] = "cancelled"
+                            continue
+                        self.pos.sell(client, p["id"], reason=o["type"].replace("_", "-") + " order")
+                    o.update(status="filled", filled_ts=time.time(), fill_price=px)
+                    done.append(o)
+                except RiskError as e:
+                    o.update(status="failed", error=str(e))
+            self.items = self.items[-300:]
+            self._save()
+        return done

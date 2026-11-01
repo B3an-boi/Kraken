@@ -25,6 +25,11 @@ if ! command -v gmgn-cli >/dev/null 2>&1; then
   echo "Installing gmgn-cli..."
   npm install -g gmgn-cli || { echo "npm install failed. Try: sudo npm install -g gmgn-cli"; exit 1; }
 fi
+v=$(gmgn-cli --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+if [ -n "$v" ] && [ "$(printf '%s\n1.7.0\n' "$v" | sort -V | head -1)" != "1.7.0" ]; then
+  echo "Updating gmgn-cli ($v -> latest)..."
+  npm install -g gmgn-cli@latest || echo "Couldn't update gmgn-cli automatically. Run: npm install -g gmgn-cli@latest"
+fi
 echo "[3/4] gmgn-cli ready"
 chmod +x run.sh 2>/dev/null || true
 echo "[4/4] kraken installed"

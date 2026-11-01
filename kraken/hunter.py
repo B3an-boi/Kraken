@@ -128,12 +128,16 @@ class Hunter:
         return dict(results=out, stats=stats)
 
     # ── learning loop ─────────────────────────────────────────────────────
-    def poll_flow(self, client):
+    def poll_flow(self, client, tape=None, chain="sol"):
         for kind in ("sm", "kol"):
             try:
-                self.flow.add(kind, client.track(kind))
+                rows = client.track(kind)
             except Exception:
-                pass
+                continue
+            self.flow.add(kind, rows)
+            if tape is not None:
+                for r in rows:
+                    tape.add(kind, r, chain=chain)
 
     def label_due(self, client, limit=20) -> int:
         self.sync_label_rule()

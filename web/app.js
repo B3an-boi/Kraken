@@ -7,7 +7,7 @@ const spct=(v,d=1)=>v==null?'—':(v>=0?'+':'')+(v*100).toFixed(d)+'%';
 const ago=ts=>{if(!ts)return 'never';const s=Date.now()/1000-ts;return s<60?Math.round(s)+'s ago':s<3600?Math.round(s/60)+'m ago':s<86400?(s/3600).toFixed(1)+'h ago':Math.round(s/86400)+'d ago'};
 const hhmm=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 const fdur=m=>m>=60?(m/60).toFixed(m>=600?0:1)+'h':Math.round(m)+'m';
-const ST={status:null,settings:null,view:'hunter'};
+const ST={status:null,settings:null,view:'discover'};
 
 function toast(msg,err){const d=document.createElement('div');d.textContent=msg;if(err)d.className='err';$('#toast').appendChild(d);setTimeout(()=>d.remove(),err?6000:3200)}
 async function api(path,opt={}){
@@ -20,11 +20,11 @@ function confirmDlg(title,body,yes){
   return new Promise(res=>{const d=$('#dlg');$('#dlgT').textContent=title;$('#dlgB').innerHTML=body;$('#dlgYes').textContent=yes||'Confirm';
     $('#dlgYes').onclick=()=>{d.close();res(true)};$('#dlgNo').onclick=()=>{d.close();res(false)};d.showModal();});
 }
-const tokLink=(a,sym)=>`<div class="tok"><b>${esc(sym)}</b><a href="https://gmgn.ai/${esc((ST.settings&&ST.settings.chain)||'sol')}/token/${encodeURIComponent(a)}" target="_blank" rel="noopener noreferrer">${esc(a.slice(0,5))}…${esc(a.slice(-4))} ↗</a></div>`;
+const tokLink=(a,sym)=>`<div class="tok"><b><a href="#" data-tok="${esc(a)}" style="color:inherit;text-decoration:none">${esc(sym)}</a></b><span><a href="https://gmgn.ai/${esc((ST.settings&&ST.settings.chain)||'sol')}/token/${encodeURIComponent(a)}" target="_blank" rel="noopener noreferrer">${esc(a.slice(0,5))}…${esc(a.slice(-4))} GMGN ↗</a> <a href="${typeof scanUrl==='function'?scanUrl('token',a):'#'}" target="_blank" rel="noopener noreferrer">${typeof scanName==='function'?scanName():'Solscan'} ↗</a></span></div>`;
 const scoreBar=s=>s==null?'—':`<div class="scorebar"><div class="b"><i style="width:${Math.max(0,Math.min(100,s))}%"></i></div><span>${s}</span></div>`;
 
 /* nav */
-document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>show(b.dataset.v));
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{if(location.hash)history.pushState('',document.title,location.pathname);show(b.dataset.v)});
 function show(v){
   ST.view=v;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
@@ -46,7 +46,7 @@ async function loadStatus(){
   $('#liveBanner').classList.toggle('on',real);
   $('#posPill').textContent=`${s.positions.open} open · ${s.positions.exposure.toFixed(3)} / ${s.positions.max_exposure}`;
   $('#bPos').textContent=s.positions.open;
-  $('#chainSel').value=s.chain;
+  if($('#chainSel').value!==s.chain){$('#chainSel').value=s.chain;renderChain()}
   if(s.rate_limited_s>0)toast(`GMGN rate limit: pausing ${s.rate_limited_s}s`,true);
 }
 $('#modeBtn').onclick=async()=>{
@@ -55,7 +55,30 @@ $('#modeBtn').onclick=async()=>{
   try{await api('/api/settings',{method:'POST',body:{mode:toLive?'LIVE':'SHADOW'}});toast(toLive?'LIVE trading enabled':'Back to paper trading');}catch(e){toast(e.message,true)}
   await loadStatus();
 };
-$('#chainSel').onchange=async e=>{try{await api('/api/settings',{method:'POST',body:{chain:e.target.value}});toast('Chain: '+e.target.value.toUpperCase());refresh(true)}catch(err){toast(err.message,true)}};
+/* chain picker with icons (simple drawings of each chain's mark) */
+const CHAINS={
+  sol:['Solana','<svg viewBox="0 0 32 32"><defs><linearGradient id="solg" x1="0" x2="1" y1="1" y2="0"><stop offset="0" stop-color="#9945ff"/><stop offset="1" stop-color="#14f195"/></linearGradient></defs><g fill="url(#solg)"><path d="M9 7h18l-4 3.6H5z"/><path d="M5 14.2h18l4 3.6H9z"/><path d="M9 21.4h18l-4 3.6H5z"/></g></svg>'],
+  bsc:['BSC','<svg viewBox="0 0 32 32"><g fill="#f3ba2f"><path d="m16 5 3.4 3.4-3.4 3.4-3.4-3.4z"/><path d="m22.6 11.6 3.4 3.4-3.4 3.4-3.4-3.4zM9.4 11.6l3.4 3.4-3.4 3.4L6 15z"/><path d="m16 11.9 3.1 3.1-3.1 3.1-3.1-3.1z"/><path d="m16 18.2 3.4 3.4L16 25l-3.4-3.4z"/></g></svg>'],
+  base:['Base','<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="#0052ff"/><path d="M15.9 23.4a7.4 7.4 0 1 0-7.3-8.4h9.6v1.9H8.6a7.4 7.4 0 0 0 7.3 6.5z" fill="#fff"/></svg>'],
+  eth:['Ethereum','<svg viewBox="0 0 32 32"><path d="M16 4 9 16.2l7 4.1 7-4.1z" fill="#8c93ff"/><path d="M16 4v16.3l7-4.1z" fill="#c4c8ff"/><path d="m9 17.6 7 9.9 7-9.9-7 4.1z" fill="#8c93ff"/><path d="M16 21.7v5.8l7-9.9z" fill="#c4c8ff"/></svg>']};
+function renderChain(){
+  const c=$('#chainSel').value||'sol';
+  $('#chainIco').innerHTML=CHAINS[c][1];$('#chainName').textContent=c.toUpperCase();
+  $('#chainMenu').innerHTML=Object.entries(CHAINS).map(([k,[name,ico]])=>`<button role="option" aria-selected="${k===c}" class="${k===c?'on':''}" data-chain="${k}"><span class="cico">${ico}</span>${name}<svg class="chk" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></button>`).join('');
+}
+$('#chainBtn').onclick=e=>{e.stopPropagation();const m=$('#chainMenu'),on=!m.classList.contains('on');m.classList.toggle('on',on);$('#chainBtn').setAttribute('aria-expanded',on)};
+$('#chainMenu').onclick=e=>{const b=e.target.closest('[data-chain]');if(!b)return;$('#chainMenu').classList.remove('on');$('#chainBtn').setAttribute('aria-expanded','false');
+  if(b.dataset.chain===$('#chainSel').value)return;$('#chainSel').value=b.dataset.chain;renderChain();$('#chainSel').dispatchEvent(new Event('change'))};
+document.addEventListener('click',()=>{$('#chainMenu').classList.remove('on');$('#chainBtn').setAttribute('aria-expanded','false')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#chainMenu').classList.remove('on')});
+renderChain();
+$('#chainSel').onchange=async e=>{try{await api('/api/settings',{method:'POST',body:{chain:e.target.value}});toast('Chain: '+e.target.value.toUpperCase());chainChanged()}catch(err){toast(err.message,true)}};
+function chainChanged(){
+  /* forget everything that belongs to the previous chain, then reload the current view */
+  if(typeof CC!=='undefined'){CC.disc=null;CC.tape=[];if(typeof MiniGraph!=='undefined'&&MiniGraph.svg){MiniGraph.nodes=new Map();MiniGraph.update([])}}
+  ['#dTbl','#dTape','#mHeat','#dCalls','#dKpis'].forEach(s=>{const el=$(s);if(el)el.innerHTML=''});
+  if(['token','wallet'].includes(ST.view)){history.pushState('',document.title,location.pathname);show('discover')}else refresh(true);
+}
 
 async function buy(addr,sym,source){
   const live=ST.status&&ST.status.mode==='LIVE',size=ST.settings&&ST.settings.risk.buy_size;
@@ -81,8 +104,8 @@ function sparkSVG(o){
   const frac=Math.min(1,b.length/Math.max(windowMin,1));
   const x0=W-P-(W-2*P)*frac,y0=y(b.top),y1=y(b.low);
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Price chart with the base boxed">
-    <rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${(W-P-x0).toFixed(1)}" height="${Math.max(2,y1-y0).toFixed(1)}" fill="#3ef0c61a" stroke="#3ef0c6" stroke-dasharray="3 3" rx="3"/>
-    <path d="${line}" fill="none" stroke="#2bb8ff" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+    <rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${(W-P-x0).toFixed(1)}" height="${Math.max(2,y1-y0).toFixed(1)}" fill="#ff5b3714" stroke="#ff5b37" stroke-dasharray="3 3" rx="3"/>
+    <path d="${line}" fill="none" stroke="#8b8cff" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>`;
 }
 function hunterCard(o){
   const b=o.base,sup=o.supply||0,mc=v=>money(v*sup),floor='pump_x' in b;
@@ -150,13 +173,21 @@ async function loadPositions(){
      <td class="num">${Number(x.entry_price).toPrecision(4)}</td><td class="num">${Number(x.last_price).toPrecision(4)}</td>
      <td class="num ${x.pnl_pct>=0?'up':'down'}">${spct(x.pnl_pct)}</td>
      <td>${(x.signals||[]).map(s=>`<span class="tag warn" title="${esc(s.msg)}">${esc(s.kind.replace('_',' '))}</span>`).join('')||'<span class="sub">—</span>'}</td>
-     <td class="sub">${ago(x.entry_ts)}</td><td><button class="btn small danger" data-sell="${esc(x.id)}" data-sym="${esc(x.symbol)}">Sell</button></td></tr>`).join('')
+     <td class="sub">${ago(x.entry_ts)}${x.tx&&x.tx!=='demo-tx'?' '+scanIcon('tx',x.tx):''}</td><td><button class="btn small danger" data-sell="${esc(x.id)}" data-sym="${esc(x.symbol)}">Sell</button></td></tr>`).join('')
      :`<tr><td colspan="9"><div class="empty"><div class="big">🦑</div>No open positions. Buy from Base Hunter or the Screener.</div></td></tr>`)+'</tbody>';
   $('#pClosed').innerHTML=`<thead><tr><th>Token</th><th>Mode</th><th class="num">Size</th><th class="num">P/L</th><th>Reason</th><th>Closed</th></tr></thead><tbody>`+
    (p.closed.length?p.closed.map(x=>`<tr><td>${tokLink(x.address,x.symbol)}</td><td><span class="tag">${x.mode}</span></td><td class="num">${x.size}</td><td class="num ${x.pnl_pct>=0?'up':'down'}">${spct(x.pnl_pct)} (${x.pnl>=0?'+':''}${x.pnl.toFixed(4)})</td><td class="sub">${esc(x.exit_reason)}</td><td class="sub">${ago(x.exit_ts)}</td></tr>`).join('')
      :`<tr><td colspan="6"><div class="empty">Nothing closed yet.</div></td></tr>`)+'</tbody>';
 }
 $('#pOpen').onclick=e=>{const b=e.target.closest('[data-sell]');if(b)sell(b.dataset.sell,b.dataset.sym)};
+async function loadOrders(){
+  let o;try{o=await api('/api/orders')}catch(e){return}
+  const typ=t=>({buy_low:'buy the dip',buy_high:'buy the breakout',take_profit:'sell at target',stop_loss:'sell at stop'}[t]||t);
+  const rows=o.paper.map(x=>`<tr><td><a href="#" data-tok="${esc(x.address)}"><b>${esc(x.symbol)}</b></a></td><td><span class="tag">paper</span></td><td>${typ(x.type)}</td><td class="num">${Number(x.trigger).toPrecision(4)}</td><td class="num">${x.type.startsWith('buy')?x.size:'all'}</td><td class="sub">expires in ${fdur(Math.max(0,x.expires-Date.now()/1000)/60)}</td><td><button class="btn small" data-cxl="${esc(x.id)}">Cancel</button></td></tr>`)
+   .concat((o.live||[]).map(x=>`<tr><td><a href="#" data-tok="${esc(x.base_token||x.token_address||'')}"><b>${esc(x.symbol||x.base_token_symbol||short(x.base_token||''))}</b></a></td><td><span class="tag bad">live</span></td><td>${esc(typ(x.sub_order_type||x.order_type||''))}</td><td class="num">${esc(x.check_price||'')}</td><td class="num">${esc(x.amount_in||'')}</td><td class="sub">${esc(x.status||'open')}</td><td><button class="btn small" data-cxl="${esc(x.order_id||x.id||'')}" data-live="1">Cancel</button></td></tr>`));
+  $('#oTbl').innerHTML=`<thead><tr><th>Token</th><th>Mode</th><th>Type</th><th class="num">Trigger</th><th class="num">Size</th><th>Status</th><th></th></tr></thead><tbody>${rows.length?rows.join(''):`<tr><td colspan="7"><div class="empty">No open orders. Place one from a token's research page.${o.live_error?'<br><span class="sub">Live orders: '+esc(o.live_error)+'</span>':''}</div></td></tr>`}</tbody>`;
+}
+$('#oTbl').onclick=async e=>{const b=e.target.closest('[data-cxl]');if(!b)return;try{await api('/api/orders/cancel',{method:'POST',body:{id:b.dataset.cxl,live:!!b.dataset.live}});toast('Order cancelled');loadOrders()}catch(err){toast(err.message,true)}};
 
 /* learning */
 const BT=[['min_score','Min rule score','',1],['max_range','Max base range %','pct',1],['min_base_len','Min base (min)','',5],['min_pump','Min pump ×','',0.5],['min_retrace','Min retrace %','pct',5],['max_vol_ratio','Max vol / pump %','pct',5],['tp','Take profit %','pct',5],['sl','Stop loss %','pct',5]];
@@ -274,7 +305,7 @@ function renderKeys(){
   const k=ST.status&&ST.status.keys;if(!k)return;
   const it=(ok,label,note)=>`<div class="row" style="gap:8px;margin:4px 0"><span class="tag ${ok?'good':'warn'}">${ok?'✓':'—'}</span><span>${label}</span><span class="sub">${note}</span></div>`;
   $('#keyCard').innerHTML=`<h3>GMGN connection</h3><div class="sub" style="margin-bottom:8px">Keys stay on this computer in <span class="mono">${esc(k.env_path)}</span>. Kraken only listens on 127.0.0.1.</div>`+
-   it(k.cli,'gmgn-cli installed',k.cli?'':'npm install -g gmgn-cli')+it(k.api_key,'API key',k.api_key?'live market data':'required: run python -m kraken setup')+it(k.private_key,'Signing key',k.private_key?'LIVE trading possible':'paper trading only (that\'s fine)')+`<button class="btn small" id="reconnect" style="margin-top:10px">${k.api_key?'Reconnect GMGN':'Connect GMGN'}</button>`;
+   it(k.cli&&!k.cli_outdated,'gmgn-cli '+(k.cli_version?'v'+k.cli_version:'installed'),!k.cli?'npm install -g gmgn-cli':k.cli_outdated?'outdated: call-outs and name search need 1.7+. Run: npm install -g gmgn-cli@latest, then restart kraken':'')+it(k.api_key,'API key',k.api_key?'live market data':'required: run python -m kraken setup')+it(k.private_key,'Signing key',k.private_key?'LIVE trading possible':'paper trading only (that\'s fine)')+`<button class="btn small" id="reconnect" style="margin-top:10px">${k.api_key?'Reconnect GMGN':'Connect GMGN'}</button>`;
   $('#reconnect').onclick=()=>openWizard(true);
 }
 
@@ -326,11 +357,10 @@ async function refresh(force){
     if(!ST.settings||force){ST.settings=await api('/api/settings');fillSettings(ST.settings)}
     await loadStatus();
     const v=ST.view;
-    if(v==='hunter')await loadHunter();else if(v==='screen')await loadScreen();else if(v==='positions')await loadPositions();
+    if(v==='discover'){if(force||!CC.disc||Date.now()/1000-CC.disc.ts>50)await loadDiscover();else loadTapeMini()}
+    else if(v==='tape')await loadTape();else if(v==='token'||v==='wallet'){}
+    else if(v==='hunter')await loadHunter();else if(v==='screen')await loadScreen();else if(v==='positions'){await loadPositions();await loadOrders()}
     else if(v==='learn')await loadLearn();else if(v==='activity')await loadActivity();else if(v==='settings')renderKeys();
   }catch(e){$('#srcTxt').textContent='backend offline';$('#srcPill').className='pill';}
 }
-try{const v=localStorage.getItem('kraken.view');if(v&&$('#v-'+v))ST.view=v;$('#sRej').checked=localStorage.getItem('kraken.rej')!=='0'}catch(e){}
-show(ST.view);runBT();
-api('/api/setup').then(s=>{if(!s.ready&&!wizSkipped)openWizard(false)}).catch(()=>{});
-setInterval(()=>{if(!document.hidden&&ST.view!=='settings')refresh()},6000);
+/* startup lives at the end of cc.js, which loads after this file */

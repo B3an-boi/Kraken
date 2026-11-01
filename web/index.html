@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>kraken</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐙</text></svg>">
+<link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --abyss:#060b14;--deep:#0b1422;--panel:#101b2d;--raise:#16243a;--line:#1f3150;--line2:#2a4268;
-  --text:#dfe8f5;--dim:#7d90ad;--faint:#4f6382;
-  --glow:#3ef0c6;--glow2:#2bb8ff;--coral:#ff6b6b;--amber:#ffc15e;--violet:#a98bff;
-  --sans:'Space Grotesk',system-ui,-apple-system,Segoe UI,sans-serif;--mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
-  --r:12px;
+  --abyss:#0c0c0d;--deep:#161618;--panel:#1b1b1e;--raise:#242427;--line:#26262a;--line2:#323237;
+  --text:#ededee;--dim:#9b9ba2;--faint:#64646b;
+  --glow:#ff5b37;--glow2:#8b8cff;--coral:#ff6a4d;--amber:#ffb547;--violet:#8b8cff;--up:#8b8cff;--down:#ff6a4d;
+  --sans:'Inter',system-ui,-apple-system,Segoe UI,sans-serif;--mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+  --r:20px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--abyss);color:var(--text);font-family:var(--sans);font-size:14px}
@@ -133,6 +133,46 @@ main{padding:18px;max-width:1400px;margin:0 auto}
 @keyframes in{from{transform:translateY(8px);opacity:0}}
 .spin{display:inline-block;width:10px;height:10px;border:2px solid var(--glow);border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.search{flex:1;max-width:560px;display:flex;gap:6px;min-width:200px}
+.search input{flex:1;background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:8px 12px;font-family:var(--mono);font-size:12.5px}
+.search input:focus{outline:none;border-color:var(--glow)}
+.feedbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip{background:var(--panel);border:1px solid var(--line2);color:var(--dim);border-radius:99px;padding:5px 12px;font-size:12px;cursor:pointer}
+.chip.on{border-color:var(--glow);color:var(--glow);background:#3ef0c612}
+.disc{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+.tape{position:sticky;top:84px;max-height:calc(100vh - 104px);overflow:auto}
+.tape .t{display:grid;grid-template-columns:44px 1fr auto;gap:8px;padding:7px 0;border-bottom:1px solid #1f315066;font-size:12px;align-items:center}
+.tape .t .s{font-family:var(--mono);font-size:10.5px;text-transform:uppercase}
+.tape .t .s.buy{color:var(--glow)}.tape .t .s.sell{color:var(--coral)}
+.safe{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:22px;border-radius:6px;font-family:var(--mono);font-size:12px;font-weight:500}
+.safe.g{background:#3ef0c61f;color:var(--glow)}.safe.y{background:#ffc15e1f;color:var(--amber)}.safe.r{background:#ff6b6b1f;color:var(--coral)}
+.tbl tr.click{cursor:pointer}
+.back{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;padding:0;margin-bottom:12px}
+.back:hover{color:var(--glow)}
+.hero{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.hero img{width:52px;height:52px;border-radius:12px;background:var(--raise)}
+.hero h2{margin:0;font-size:22px;letter-spacing:-.02em}
+.hero .addr{font-family:var(--mono);font-size:11.5px;color:var(--dim);cursor:pointer}
+.big{font-family:var(--mono);font-size:40px;line-height:1}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px}
+.dd li{margin:4px 0;font-size:12.5px}
+.dd .m{font-family:var(--mono);color:var(--coral);margin-right:6px}
+.report{white-space:pre-wrap;font-family:var(--mono);font-size:11.5px;line-height:1.5;background:var(--abyss);border:1px solid var(--line);border-radius:10px;padding:14px;max-height:520px;overflow:auto;color:var(--text)}
+.buybox .f{margin-bottom:10px}
+.chart svg{width:100%;height:160px;display:block;background:#060b1488;border-radius:8px}
+@media (max-width:980px){.disc{grid-template-columns:1fr}.tape{position:static;max-height:none}}
+.gwrap{position:relative;height:620px;background:radial-gradient(800px 400px at 50% 40%,#0f2a3f55,transparent),#04080f;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.gwrap svg{width:100%;height:100%;display:block;cursor:grab}
+.gwrap svg:active{cursor:grabbing}
+.gpanel{position:absolute;top:12px;right:12px;width:290px;max-height:calc(100% - 24px);overflow:auto;background:#0b1422ee;border:1px solid var(--line2);border-radius:12px;padding:14px;font-size:12.5px;display:none;backdrop-filter:blur(6px)}
+.gpanel.on{display:block}
+.glegend{position:absolute;left:12px;bottom:12px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--dim);background:#0b1422cc;padding:6px 10px;border-radius:8px}
+.glegend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.gtip{position:absolute;pointer-events:none;background:#0b1422f2;border:1px solid var(--line2);border-radius:8px;padding:6px 9px;font-size:11.5px;max-width:300px;display:none;z-index:3}
+.gtools{position:absolute;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap}
+.gnode text{font-family:var(--mono);font-size:10px;fill:#b9c6da;pointer-events:none;paint-order:stroke;stroke:#04080f;stroke-width:3px}
+.glink{stroke-opacity:.55}
+.glink.hi{stroke-opacity:1}
 .wiz{position:fixed;inset:0;z-index:40;background:radial-gradient(900px 500px at 50% 0%,#0f2a3faa,transparent),#060b14f2;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 16px}
 .wiz.on{display:flex}
 .wiz .box{width:100%;max-width:560px;background:linear-gradient(180deg,var(--panel),var(--deep));border:1px solid var(--line2);border-radius:16px;padding:28px}
@@ -157,31 +197,203 @@ dialog::backdrop{background:#000a}
   .hcards{grid-template-columns:1fr}.logo small{display:none}.hide-sm{display:none}
   .bars .br{grid-template-columns:90px 1fr 70px}
 }
+#dTbl{table-layout:fixed;min-width:0}
+#dTbl th:nth-child(1){width:auto}#dTbl th:nth-child(2){width:66px}#dTbl th:nth-child(3){width:78px}#dTbl th:nth-child(4){width:68px}#dTbl th:nth-child(5){width:56px}#dTbl th:nth-child(6){width:62px}
+#dTbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dTbl .tok b,#dTbl .tok span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.q-screen .qscroll{overflow-x:hidden}
+.dash{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}
+.q-graph{grid-column:span 5}.q-screen{grid-column:span 7}.q-heat{grid-column:span 5}.q-live{grid-column:span 4}.q-side{grid-column:span 3}
+.qh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.qh h3{margin:0}
+.dash .card{display:flex;flex-direction:column;min-height:0}
+.mini{position:relative;height:430px;border-radius:14px;background:#0f0f11;overflow:hidden}
+.mini svg{width:100%;height:100%;display:block}
+.q-screen .qscroll{height:430px;overflow:auto;margin:0 -6px}
+.q-screen .tbl th{position:sticky;top:0;z-index:1}
+.q-screen .feedbar{margin-bottom:10px}
+.dash .tape{position:static;max-height:330px;overflow:auto}
+#dPos .pr,#dCalls .pr{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.heat{display:grid;grid-template-columns:72px repeat(12,1fr);gap:5px;align-items:center}
+.heat .c{height:26px;border-radius:6px;background:var(--raise)}
+.heat .c.b{background:var(--glow)}.heat .c.s{background:var(--glow2)}
+.heat .lb{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.heat .lb:hover{color:var(--glow)}
+.heat .ax{font-size:10.5px;color:var(--faint);text-align:center}
+.hlegend{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--faint)}
+.hlegend i{width:10px;height:10px;border-radius:3px;background:var(--glow);display:inline-block}
+@media (max-width:1250px){.q-graph,.q-screen,.q-heat{grid-column:span 12}.q-live{grid-column:span 7}.q-side{grid-column:span 5}}
+@media (max-width:760px){.q-live,.q-side{grid-column:span 12}.mini,.q-screen .qscroll{height:360px}}
+.scan{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:5px;border-radius:5px;background:var(--raise);color:var(--dim);font-size:11px;text-decoration:none;vertical-align:1px}
+.scan:hover{background:var(--glow);color:#fff}
+.tok span a{margin-right:6px}
+.chainpick{position:relative}
+.chainbtn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font:600 13px var(--sans)!important;color:var(--text)!important;padding:0 14px!important}
+.chainbtn .caret{width:14px;height:14px;fill:none;stroke:var(--dim);stroke-width:2;transition:.15s}
+.chainbtn[aria-expanded="true"] .caret{transform:rotate(180deg)}
+.cico{display:inline-flex;width:20px;height:20px}.cico svg{width:100%;height:100%}
+.chainmenu{position:absolute;right:0;top:56px;z-index:60;min-width:190px;background:var(--deep);border:1px solid var(--line2);border-radius:16px;padding:6px;box-shadow:0 18px 50px #000a;display:none}
+.chainmenu.on{display:block}
+.chainmenu button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--dim);padding:10px 12px;border-radius:10px;font:500 14px var(--sans);cursor:pointer;text-align:left}
+.chainmenu button:hover{background:var(--panel);color:var(--text)}
+.chainmenu button.on{color:var(--text)}
+.chainmenu button .chk{margin-left:auto;width:16px;height:16px;fill:none;stroke:var(--glow);stroke-width:2.5;opacity:0}
+.chainmenu button.on .chk{opacity:1}
+.tv{padding:16px 18px}
+.tvbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.tvleg{display:flex;gap:14px;flex-wrap:wrap;font:11.5px var(--mono);color:var(--dim)}
+.tvleg b{color:var(--text);font-weight:500}
+.tvtf{display:flex;gap:2px;background:var(--abyss);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tvtf button{background:none;border:none;color:var(--dim);font:500 12px var(--mono);padding:5px 10px;border-radius:7px;cursor:pointer}
+.tvtf button:hover{color:var(--text)}
+.tvtf button.on{background:var(--raise);color:var(--glow)}
+.tvbox{position:relative;height:420px;border-radius:12px;overflow:hidden;background:#0f0f11}
+.tvmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--dim);font-size:13px;z-index:2}
+.gpills{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 12px}
+.gpill{display:inline-flex;align-items:center;gap:7px;background:transparent;border:1px solid color-mix(in srgb,var(--c) 55%,transparent);color:var(--text);border-radius:99px;padding:6px 13px;font:500 12.5px var(--sans);cursor:pointer;transition:.15s}
+.gpill i{width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 6px var(--c)}
+.gpill .n{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.gpill.off{opacity:.35;border-color:var(--line2)}
+.gpill.empty{opacity:.3;pointer-events:none}
+.gpill.off i{box-shadow:none}
+.gcard .gwrap{height:560px;border-radius:16px;background:radial-gradient(520px 360px at 50% 50%,#ffffff07,transparent 70%),#0d0d0f;border:1px solid var(--line)}
+.ghint{position:absolute;right:14px;top:12px;font:11px var(--mono);color:var(--faint);pointer-events:none}
+.gcard .gwrap svg{cursor:grab}
+.gn .t1{font:600 12px var(--sans);fill:#f2f2f3;paint-order:stroke;stroke:#0d0d0f;stroke-width:4px;pointer-events:none}
+.gn .t2{font:10px var(--mono);fill:#8d8d95;paint-order:stroke;stroke:#0d0d0f;stroke-width:4px;pointer-events:none}
+.gn .cnt{font:600 10.5px var(--mono);fill:#e6e6ea;pointer-events:none}
+.gn:hover .dot{stroke:#fff;stroke-width:2}
+.gdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:7px;vertical-align:1px;box-shadow:0 0 6px var(--c)}
+.gpanel{border-radius:16px;background:#141416f2;border-color:var(--line2);width:300px}
+.glrow{padding:7px 0;border-bottom:1px solid var(--line);font-size:12px;display:flex;flex-direction:column;gap:2px}
+.gtip{border-radius:10px;background:#141416f2;border-color:var(--line2)}
+/* ── dashboard theme ── */
+body{background:var(--abyss);display:flex;min-height:100vh}
+.side{width:248px;flex:none;position:sticky;top:0;height:100vh;padding:14px;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:10px;background:var(--deep);border:1px solid var(--line);border-bottom:none;border-radius:20px 20px 0 0;padding:18px 18px 14px}
+.brand .mark{width:34px;height:34px;color:#fff;background:var(--glow);border-radius:10px;padding:5px}
+.brand b{font-size:17px;letter-spacing:-.01em;display:block}
+.brand small{font-family:var(--mono);font-size:10px;color:var(--faint)}
+#nav{flex:1;display:flex;flex-direction:column;gap:4px;padding:6px 10px 14px;background:var(--deep);border:1px solid var(--line);border-top:none;border-radius:0 0 20px 20px;overflow-x:hidden;overflow-y:auto}
+#nav button,#nav .navlink{display:flex;align-items:center;gap:12px;background:none;border:none;color:var(--text);padding:11px 12px;border-radius:12px;font-size:14.5px;font-weight:500;cursor:pointer;text-decoration:none;text-align:left;white-space:nowrap}
+#nav svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#nav button:hover,#nav .navlink:hover{background:var(--panel);color:var(--text)}
+#nav button.on{background:var(--raise);color:var(--glow)}
+#nav .badge{margin-left:auto;background:var(--raise);color:var(--dim);font-family:var(--mono);font-size:10.5px;border-radius:99px;padding:1px 7px}
+#nav button.on .badge{background:#ff5b3722;color:var(--glow)}
+.navfill{flex:1;min-height:20px}
+.appcol{flex:1;min-width:0;display:flex;flex-direction:column}
+header.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:14px 18px 10px;background:linear-gradient(var(--abyss) 75%,transparent);backdrop-filter:none;border-bottom:none;flex-wrap:wrap}
+.topbar .search{flex:1;max-width:560px;display:flex;align-items:center;gap:10px;background:var(--deep);border:1px solid var(--line);border-radius:99px;padding:0 18px;height:48px}
+.topbar .search svg{width:18px;height:18px;fill:none;stroke:var(--dim);stroke-width:2;flex:none}
+.topbar .search input{flex:1;background:none;border:none;color:var(--text);font-family:var(--sans);font-size:14.5px;padding:0}
+.topbar .search input:focus{outline:none}
+.topbar .search:focus-within{border-color:var(--glow)}
+.topbar .pill,.topbar select.chain{height:48px;border-radius:99px;background:var(--deep);border:1px solid var(--line);padding:0 16px;font-size:12px}
+main{padding:10px 18px 24px;max-width:1500px;width:100%;margin:0}
+.card,.hc,.tile{background:var(--deep);border:1px solid var(--line);border-radius:var(--r)}
+.card{padding:20px}.tile{padding:18px 20px}
+.card h3{font-size:16px;font-weight:600}
+.tile .k{font-size:13px;letter-spacing:0;text-transform:none;color:var(--text);font-weight:500}
+.tile .v{font-family:var(--sans);font-size:26px;font-weight:600;letter-spacing:-.01em;margin-top:10px}
+.tile .s{color:var(--faint);font-size:11.5px;margin-top:10px}
+.tblwrap{background:var(--deep);border:1px solid var(--line);border-radius:var(--r);padding:8px}
+.tbl th{background:var(--raise);color:var(--dim);font-size:11px;font-weight:500;letter-spacing:.05em;border-bottom:none;padding:11px 14px}
+.tbl th:first-child{border-radius:10px 0 0 10px}.tbl th:last-child{border-radius:0 10px 10px 0}
+.tbl td{padding:13px 14px;border-bottom:1px solid var(--line)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--panel)}
+.up{color:var(--up)}.down{color:var(--down)}
+.btn{border-radius:12px;background:var(--raise);border-color:var(--line2)}
+.btn.primary{background:var(--glow);border-color:var(--glow);color:#fff}
+.btn.primary:hover{color:#fff;filter:brightness(1.08)}
+.btn:hover{border-color:var(--glow);color:var(--glow)}
+.chip{background:var(--deep);border-color:var(--line2)}
+.chip.on{background:#ff5b371a;border-color:var(--glow);color:var(--glow)}
+.tag{background:var(--raise);border-radius:7px}
+.tag.good{background:#8b8cff1f;color:var(--up)}
+.tag.bad{background:#ff6a4d1f;color:var(--down)}
+.safe.g{background:#8b8cff22;color:var(--up)}.safe.y{background:#ffb54722;color:var(--amber)}.safe.r{background:#ff6a4d22;color:var(--down)}
+.scorebar .b i,.progress i{background:linear-gradient(90deg,var(--glow2),var(--glow))}
+.pill.live .dot{background:var(--up);box-shadow:0 0 8px var(--up)}
+.funnel span{background:var(--deep);border-color:var(--line);border-radius:10px}
+.why{border-radius:8px}
+#toast div{border-left-color:var(--glow);border-radius:12px}
+.banner{border-radius:14px}
+dialog{border-radius:20px}
+.f input,.f select{border-radius:10px}
+.chg{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-family:var(--mono);padding:3px 8px;border-radius:7px;background:var(--raise);white-space:nowrap}
+.chg.up{color:var(--up);background:#8b8cff1a}.chg.down{color:var(--down);background:#ff6a4d1a}
+.tile .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px}
+.wiz .box{border-radius:24px;background:var(--deep)}
+.hc{padding:18px}
+.gwrap{border-radius:var(--r);background:radial-gradient(800px 400px at 50% 40%,#ff5b370d,transparent),#0f0f11}
+@media (max-width:900px){
+  body{display:block}.side{position:static;width:auto;height:auto;padding:10px 10px 0}
+  #nav{flex-direction:row;overflow-x:auto;padding:6px}
+  #nav button,#nav .navlink{flex:none;padding:9px 12px;font-size:13px}
+  .navfill{display:none}
+  header.topbar{position:static}.topbar .search{max-width:none;flex-basis:100%}
+}
 </style>
 </head>
 <body>
-<header>
-  <div class="top">
-    <div class="logo">🐙 <span><b>kraken</b></span><small id="ver"></small></div>
-    <span class="pill" id="srcPill"><span class="dot"></span><span id="srcTxt">connecting…</span></span>
-    <div class="spacer"></div>
-    <span class="pill hide-sm" id="posPill">0 open</span>
-    <select class="chain" id="chainSel" title="Chain"><option value="sol">SOL</option><option value="bsc">BSC</option><option value="base">BASE</option><option value="eth">ETH</option></select>
-    <button class="pill modebtn" id="modeBtn" title="Switch paper / real trading"><span class="dot"></span><span id="modeTxt">SHADOW</span></button>
-  </div>
+<aside class="side">
+  <div class="brand"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" d="M32 6c-10 0-17 7.5-17 17 0 6 2.7 10.6 6.5 13.4-1.6 3.8-4.6 7.2-8.5 8.8-1.6.6-1.2 2.9.5 2.9 5.2 0 9.4-3 11.9-6.6.3 4.6-1.2 9-4.4 12.2-1.2 1.2-.2 3.2 1.5 2.8 5.3-1.3 8.6-6 9.5-11.3.9 5.3 4.2 10 9.5 11.3 1.7.4 2.7-1.6 1.5-2.8-3.2-3.2-4.7-7.6-4.4-12.2 2.5 3.6 6.7 6.6 11.9 6.6 1.7 0 2.1-2.3.5-2.9-3.9-1.6-6.9-5-8.5-8.8C46.3 33.6 49 29 49 23 49 13.5 42 6 32 6Zm-6.5 15a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm13 0a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg><div><b>kraken</b><small id="ver"></small></div></div>
   <nav id="nav">
-    <button data-v="hunter" class="on">Base Hunter<span class="badge" id="bHunter">0</span></button>
-    <button data-v="screen">Screener<span class="badge" id="bScreen">0</span></button>
-    <button data-v="positions">Positions<span class="badge" id="bPos">0</span></button>
-    <button data-v="learn">Learning</button>
-    <button data-v="activity">Activity</button>
-    <button data-v="settings">Settings</button>
+    <button data-v="discover" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg><span>Discover</span></button>
+    <button data-v="tape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Smart money</span></button>
+    <button data-v="hunter"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span>Base Hunter</span><span class="badge" id="bHunter">0</span></button>
+    <button data-v="screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 8v5l-4 2v-7z"/></svg><span>Screener</span><span class="badge" id="bScreen">0</span></button>
+    <button data-v="positions"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M16 12h2M3 10h18M7 6V4h10v2"/></svg><span>Positions</span><span class="badge" id="bPos">0</span></button>
+    <button data-v="learn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6"/></svg><span>Learning</span></button>
+    <button data-v="activity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Activity</span></button>
+    <div class="navfill"></div>
+    <button data-v="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span>Settings</span></button>
+    <a class="navlink" href="https://github.com/B3an-boi/Kraken#troubleshooting" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01"/></svg><span>Help center</span></a>
   </nav>
+</aside>
+<div class="appcol">
+<header class="topbar">
+  <form class="search" id="searchForm" autocomplete="off"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Paste a CA, wallet, or token name" aria-label="Search token or wallet" spellcheck="false"></form>
+  <div class="spacer"></div>
+  <span class="pill" id="srcPill"><span class="dot"></span><span id="srcTxt">connecting…</span></span>
+  <span class="pill hide-sm" id="posPill">0 open</span>
+  <div class="chainpick" id="chainPick">
+    <button class="pill chainbtn" id="chainBtn" aria-haspopup="listbox" aria-expanded="false" title="Switch chain"><span class="cico" id="chainIco"></span><span id="chainName">SOL</span><svg class="caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div class="chainmenu" id="chainMenu" role="listbox"></div>
+    <select id="chainSel" hidden aria-hidden="true"><option value="sol">SOL</option><option value="bsc">BSC</option><option value="base">BASE</option><option value="eth">ETH</option></select>
+  </div>
+  <button class="pill modebtn" id="modeBtn" title="Switch paper / real trading"><span class="dot"></span><span id="modeTxt">SHADOW</span></button>
 </header>
 <main>
   <div class="banner" id="demoBanner"><b>No GMGN key found. This is a simulated market, not real data.</b> Run <span class="mono">python -m kraken setup</span> in the kraken folder, add your API key, then restart kraken.</div>
   <div class="banner red" id="liveBanner"><b>LIVE trading is on.</b> Buy and Sell send real swaps with real funds. Switch back to SHADOW (top right) to paper trade.</div>
-  <section class="view on" id="v-hunter">
+  <section class="view on" id="v-discover">
+    <div class="kpis" id="dKpis"></div>
+    <div class="dash">
+      <div class="card q-graph"><div class="qh"><div><h3>Smart money network</h3><div class="sub">Last 60 min · wallets (purple) → tokens (coral) they bought</div></div><button class="btn small" data-v-go="tape">View all</button></div>
+        <div class="mini" id="mGraph"><div class="gtip" id="mTip"></div></div></div>
+      <div class="card q-screen"><div class="qh"><h3>Screener</h3><div class="row" style="gap:8px"><label class="chk"><input type="checkbox" id="dSafe"> Safety ≥ 60</label><button class="btn small" id="dRefresh">Refresh</button><span class="status" id="dStatus"></span></div></div>
+        <div class="feedbar" id="dChips"></div><div class="banner" id="dErr"></div>
+        <div class="qscroll"><table class="tbl" id="dTbl"></table></div></div>
+      <div class="card q-heat"><div class="qh"><div><h3>Smart money flow</h3><div class="sub">Net buying by token, 5-minute buckets</div></div><div class="hlegend"><i style="opacity:.25"></i>small<i style="opacity:.55"></i><i style="opacity:.8"></i><i></i>large</div></div><div id="mHeat"></div></div>
+      <div class="card q-live"><div class="qh"><h3>Live trades</h3><button class="btn small" data-v-go="tape">All</button></div><div id="dTape" class="tape"></div></div>
+      <div class="card q-side"><div class="qh"><h3>Your positions</h3><button class="btn small" data-v-go="positions">View all</button></div><div id="dPos"></div>
+        <div class="qh" style="margin-top:16px"><h3>Latest call-outs</h3></div><div id="dCalls"></div></div>
+    </div>
+  </section>
+  <section class="view" id="v-tape">
+    <div class="toolbar"><div class="feedbar" id="tChips"></div><span class="status">Smart money and KOL trades refresh every minute; followed wallets every 2 minutes.</span></div>
+    <div class="grid2" style="grid-template-columns:minmax(0,2fr) minmax(280px,1fr)"><div class="tblwrap"><table class="tbl" id="tTbl"></table></div>
+      <div class="card"><h3>Wallets you follow</h3><div class="sub">Follow any wallet from its research page, or paste one here.</div>
+        <form class="row" id="fForm" style="margin-top:10px;gap:6px"><input id="fAddr" placeholder="Wallet address" style="flex:1;background:var(--abyss);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;font-family:var(--mono);font-size:12px"><input id="fLabel" placeholder="Label" style="width:90px;background:var(--abyss);color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;font-size:12px"><button class="btn small primary">Follow</button></form>
+        <div id="fList" style="margin-top:10px"></div></div></div>
+  </section>
+  <section class="view" id="v-token"><div id="tokBody"></div></section>
+  <section class="view" id="v-wallet"><div id="walBody"></div></section>
+  <section class="view" id="v-hunter">
     <div class="toolbar">
       <button class="btn primary" id="hScan">Scan now</button>
       <label class="chk"><input type="checkbox" id="hAuto"> Auto-scan</label>
@@ -205,6 +417,7 @@ dialog::backdrop{background:#000a}
   <section class="view" id="v-positions">
     <div class="tiles" id="pTiles"></div>
     <div class="card" style="margin-bottom:14px"><h3>Open positions</h3><div class="sub" style="margin-bottom:10px">Prices refresh in the background. Exit signals send an alert; kraken never sells on its own.</div><div class="tblwrap"><table class="tbl" id="pOpen"></table></div></div>
+    <div class="card" style="margin-bottom:14px"><h3>Limit orders</h3><div class="sub" style="margin-bottom:10px">Paper orders (SHADOW) fill inside kraken when the price crosses. LIVE orders sit on GMGN's servers and fill even when kraken is closed.</div><div class="tblwrap"><table class="tbl" id="oTbl"></table></div></div>
     <div class="card"><h3>Closed</h3><div class="tblwrap" style="margin-top:10px"><table class="tbl" id="pClosed"></table></div></div>
   </section>
   <section class="view" id="v-learn">
@@ -236,6 +449,7 @@ dialog::backdrop{background:#000a}
     <div class="savebar" id="saveBar"><span>Unsaved changes</span><div class="row"><button class="btn" id="setUndo">Undo</button><button class="btn primary" id="setSave">Save settings</button></div></div>
   </section>
 </main>
+</div>
 <div class="wiz" id="wiz" role="dialog" aria-modal="true" aria-labelledby="wizT">
   <div class="box">
     <h2 id="wizT">🐙 Connect kraken to GMGN</h2>
@@ -261,6 +475,9 @@ dialog::backdrop{background:#000a}
 </div>
 <dialog id="dlg"><h3 id="dlgT" style="margin-top:0"></h3><p id="dlgB" class="sub" style="font-size:13px;line-height:1.5"></p><div class="row" style="justify-content:flex-end"><button class="btn" id="dlgNo">Cancel</button><button class="btn primary" id="dlgYes">Confirm</button></div></dialog>
 <div id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" integrity="sha512-vc58qvvBdrDR4etbxMdlTt4GBQk1qjvyORR2nrsPsFPyrs+/u5c3+1Ct6upOgdZoIl7eq6k3a1UPDSNAQi/32A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" integrity="sha384-OK7vELvjHdhUFi31JYioPIcRHTROLdcDa6ZsNWgvgLaKj+9JqhU0Ad8g4wz3CXjA" crossorigin="anonymous"></script>
 <script src="/assets/app.js"></script>
+<script src="/assets/cc.js"></script>
 </body>
 </html>

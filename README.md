@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🐙 kraken
+<img src="docs/banner.png" alt="kraken: a self-hosted GMGN command center for memecoin research" width="100%">
 
-**Self-hosted memecoin screener, Base Hunter and learning loop, built on [gmgn-cli](https://www.npmjs.com/package/gmgn-cli).**
+**A self-hosted GMGN command center: discover tokens, research any CA or wallet, follow smart money, and trade with guard rails. Built on [gmgn-cli](https://www.npmjs.com/package/gmgn-cli).**
 
-Find coins resting in a quiet floor after their first pump, before the breakout. Snapshot every find, grade what happened next, and let a small model learn which setups actually work, from *your* data.
+Paste a contract address and get a 0–100 safety score with every deduction explained, who holds it, who launched it and what they launched before. Paste a wallet and see who funded it and who it moves money with on a connection graph. Works on **Solana, BSC, Base and Ethereum**.
 
 Runs on your own computer · uses your own GMGN API key · keys never leave your machine · paper trading by default
 
@@ -83,6 +83,9 @@ cd Kraken
 | GMGN rejected the key | Create the key from the page the **Open GMGN** button opens (it pre-fills your public key), copy the whole key, and paste again. |
 | Key works on GMGN but kraken gets 401/403 errors | gmgn-cli only works over IPv4. Turn off IPv6 on your network adapter, then retry. |
 | "No GMGN key found" banner | Settings → **Connect GMGN**. |
+| Call-outs or name search say "update gmgn-cli" | Run `npm install -g gmgn-cli@latest`, then restart kraken. (The installer does this for you too.) |
+| The wallet graph is blank | The graph's drawing library loads from a CDN, so it needs an internet connection. |
+| Pasted a 0x address while on Solana | kraken detects the chain and switches automatically. |
 | Checking your install | In the kraken folder run `.venv\Scripts\python.exe -m kraken doctor` (Windows) or `.venv/bin/python -m kraken doctor`. |
 
 **Updating:** download the new release and unzip it to a new folder, then copy your old **`data`** folder into it to keep your settings, snapshots and positions. Run `install.cmd` in the new folder.
@@ -91,15 +94,19 @@ cd Kraken
 
 ## What's inside
 
-| Tab | What it does |
+| Screen | What it does |
 |---|---|
-| **Base Hunter** | Scans trending tokens for a *post-pump floor* (launch pump → deep flush → long, flat, quiet base near the lows) or *any tight range*. Each card shows the chart with the base boxed, pump/flush stats, smart-money flow inside the base, a 0-100 score, and dip/breakout entry levels. |
-| **Screener** | Pulls trending tokens, runs safety gates (honeypot, mint authority, taxes, rug ratio, bundlers, dev and top-10 holdings), a market/consensus gate, then a transparent momentum score. Every rejected token shows *why*. |
-| **Positions** | One-click Buy and Sell. **SHADOW** (default) records paper trades at live prices; **LIVE** sends real swaps through gmgn-cli. Risk limits on size, open positions, total exposure and daily loss. An exit monitor flags stop-loss, take-profit and safety drops. |
-| **Learning** | Every Base Hunter find is snapshotted. After the horizon (default 120 min) it's labeled a **win** if price rose +30% before falling −15%. After 40 labeled outcomes a logistic-regression model trains, is tested on a time-ordered holdout, and only gets a say in the score if it beats the rule score. |
-| **Backtest** | What-if filters over your labeled snapshots ("what if max range were 10%?", "what if min pump were 4×?"), plus win rate by bucket for score, base range, base length, pump size, retrace, volume decay and smart-money flow. |
-| **Alerts** | Push notifications via **ntfy**, **Telegram** or **Discord** when Base Hunter finds a high-scoring floor, the screener passes a token, or a position raises an exit signal. |
-| **Settings** | Every threshold is editable in the UI, validated, and saved to `data/settings.json` so it survives restarts. |
+| **Discover** (home) | One dashboard: KPI cards, a live **smart-money network** (which smart-money and KOL wallets are buying which tokens right now), a **screener** of trending, new, almost-bonded, just-bonded and hot-searched tokens with a quick safety score, a **smart-money flow heatmap**, live trades, call-outs and your positions. |
+| **CA research** | Paste any contract address (or a name: copycats are flagged). You get a **0–100 safety score** using GMGN's contract due-diligence model, with every deduction listed (mint/freeze authority, taxes, LP lock, liquidity, bundlers, snipers, rat traders, GMGN's rug label), the chart and its pattern, top holders, smart money and KOL holders, the **dev's launch history**, and GMGN's deep **holder analysis** and **dev score** reports. Plus a buy panel with take-profit, stop-loss and limit orders. |
+| **Wallet research** | P/L, win rate, hold time and trading style, recent trades, GMGN's **copy-trade check** (is the record real, is it still working, can you get filled), and a **connection graph**: who funded the wallet (exchanges are named), who it sends to and receives from, wallets that share its funder, tokens it created and buys. Click any node to expand it, and follow wallets to add them to your live feed. |
+| **Smart money** | Live smart-money, KOL and followed-wallet trades. |
+| **Base Hunter** | Finds coins resting in a quiet floor after their first pump, before the breakout. Every find is graded 2 hours later so the **Learning** tab can train a model on your own results. |
+| **Screener** | The momentum screener with safety gates and a transparent score. |
+| **Positions** | One-click buys and sells. **SHADOW** (default) is paper trading at live prices; **LIVE** sends real swaps through gmgn-cli. Take-profit and stop-loss, limit orders (buy the dip, buy the breakout, sell at target or stop), risk limits and exit alerts. |
+| **Learning** | Model progress and what-if backtests over your labeled Base Hunter snapshots. |
+| **Alerts** | ntfy, Telegram or Discord for new finds and exit signals. |
+
+Every wallet, token and transaction links to **Solscan** (BscScan, BaseScan or Etherscan on the other chains) and GMGN.
 
 More detail: **[How it works](docs/how-it-works.md)** · **[Settings reference](docs/settings.md)** · **[Alerts setup](docs/alerts.md)**
 
@@ -121,20 +128,24 @@ More detail: **[How it works](docs/how-it-works.md)** · **[Settings reference](
 ```
 kraken/
 ├── kraken/
-│   ├── server.py      FastAPI app, endpoints and background loop
-│   ├── gmgn.py        gmgn-cli client, rate gate, simulated fallback
-│   ├── screener.py    safety gates + momentum score
-│   ├── hunter.py      Base Hunter scan, flow polling, labeling
-│   ├── basehunter.py  floor detection, features, scoring, sample store, model
-│   ├── charts.py      chart read, tight-range detection, sparklines
-│   ├── positions.py   paper/live trades, risk limits, exit monitor
-│   ├── alerts.py      ntfy / Telegram / Discord
-│   ├── setup_flow.py  first-run GMGN connection (wraps gmgn-cli config)
-│   ├── backtest.py    win-rate buckets and what-if filters
-│   └── config.py      settings with validation + persistence
-├── web/               the dashboard (plain HTML/CSS/JS, no build step)
-├── data/              your local data (git-ignored)
-├── install.ps1 / install.cmd / install.sh
+│   ├── server.py        FastAPI app, endpoints and background loop
+│   ├── gmgn.py          gmgn-cli client, rate gate, simulated fallback
+│   ├── research.py      Discover feed, CA and wallet research, live tape, watchlist, report jobs
+│   ├── contract_dd.py   0-100 safety score (GMGN's contract due-diligence model)
+│   ├── graph.py         wallet connection graph
+│   ├── screener.py      safety gates + momentum score
+│   ├── hunter.py        Base Hunter scan, flow polling, labeling
+│   ├── basehunter.py    floor detection, features, scoring, sample store, model
+│   ├── positions.py     paper/live trades, TP/SL, limit orders, risk limits, exit monitor
+│   ├── charts.py        chart read, tight-range detection, sparklines
+│   ├── alerts.py        ntfy / Telegram / Discord
+│   ├── backtest.py      win-rate buckets and what-if filters
+│   ├── setup_flow.py    first-run GMGN connection (wraps gmgn-cli config)
+│   ├── config.py        settings with validation + persistence
+│   └── vendor/gmgn/     GMGN's dev-score, holder-analysis and wallet-analysis scripts (MIT)
+├── web/                 the dashboard (plain HTML/CSS/JS, no build step)
+├── data/                your local data (git-ignored)
+├── install.cmd / install.ps1 / install.sh
 └── run.cmd / run.sh
 ```
 
@@ -152,7 +163,11 @@ kraken/
 
 kraken is a research and screening tool, **not financial advice**. Memecoins are extremely risky, and most go to zero. Past win rates don't predict future results. If you enable LIVE trading you are responsible for every trade. Use at your own risk.
 
-kraken is an independent project and is not affiliated with or endorsed by GMGN. It talks to GMGN only through the public `gmgn-cli` tool, under your own API key.
+kraken is an independent project and is not affiliated with or endorsed by GMGN, Solscan, or the Kraken exchange. It talks to GMGN only through the public `gmgn-cli` tool, under your own API key.
+
+## Credits
+
+The safety score implements GMGN's [`gmgn-contract-dd`](https://github.com/GMGNAI/gmgn-skills/tree/main/skills/gmgn-contract-dd) skill, and the dev-score, holder-analysis and wallet-analysis reports run GMGN's own scripts from [GMGNAI/gmgn-skills](https://github.com/GMGNAI/gmgn-skills) unmodified. Both are MIT licensed, © 2025 GMGN; see `kraken/vendor/gmgn/LICENSE`. The graph uses [d3](https://d3js.org) (ISC).
 
 ## License
 

@@ -21,6 +21,35 @@ def gmgn_bin() -> str | None:
     return shutil.which("gmgn-cli")
 
 
+_VERSION: dict = {}
+
+
+def cli_version() -> str | None:
+    """Installed gmgn-cli version (cached), e.g. '1.7.1'."""
+    if "v" not in _VERSION:
+        v = None
+        exe = gmgn_bin()
+        if exe:
+            try:
+                out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=20)
+                m = re.search(r"(\d+\.\d+\.\d+)", out.stdout or out.stderr or "")
+                v = m.group(1) if m else None
+            except Exception:
+                v = None
+        _VERSION["v"] = v
+    return _VERSION["v"]
+
+
+MIN_CLI = (1, 7, 0)   # call-outs, market search, portfolio profits
+
+
+def cli_outdated() -> bool:
+    v = cli_version()
+    if not v:
+        return False
+    return tuple(int(x) for x in v.split(".")) < MIN_CLI
+
+
 def load_env(path: pathlib.Path = GMGN_ENV) -> dict:
     out = {}
     if not path.exists():
@@ -51,7 +80,8 @@ def write_env(api_key: str, private_key: str = "", path: pathlib.Path = GMGN_ENV
 
 def key_status() -> dict:
     env = load_env()
-    return dict(cli=bool(gmgn_bin()), api_key=bool(env.get("GMGN_API_KEY")),
+    return dict(cli=bool(gmgn_bin()), cli_version=cli_version(), cli_outdated=cli_outdated(),
+                api_key=bool(env.get("GMGN_API_KEY")),
                 private_key=bool(env.get("GMGN_PRIVATE_KEY")), env_path=str(GMGN_ENV))
 
 
@@ -210,14 +240,73 @@ class LiveClient:
                 return self._wallet
         raise GMGNError(f"no {self.chain} wallet bound to this GMGN API key")
 
-    def swap(self, input_token, output_token, amount=None, percent=None, slippage=0.15) -> dict:
+    def _fees(self) -> list:
+        """Default priority/tip fees; GMGN requires them on SOL for TP/SL and strategy orders."""
+        if self.chain == "sol":
+            return ["--priority-fee", "0.0001", "--tip-fee", "0.0001"]
+        return []
+
+    def swap(self, input_token, output_token, amount=None, percent=None, slippage=0.15,
+             take_profit=None, stop_loss=None) -> dict:
+        """slippage, take_profit, stop_loss are fractions (0.15 = 15%). gmgn-cli wants percents."""
         args = ["swap", "--from", self.wallet_address(), "--input-token", input_token,
-                "--output-token", output_token, "--slippage", str(slippage)]
-        args += ["--percent", str(percent)] if percent is not None else ["--amount", str(int(amount))]
+                "--output-token", output_token, "--slippage", f"{slippage * 100:g}"]
+        args += ["--percent", f"{percent:g}"] if percent is not None else ["--amount", str(int(amount))]
+        cond = []
+        if take_profit:
+            cond.append({"order_type": "profit_stop", "side": "sell", "price_scale": f"{take_profit * 100:g}", "sell_ratio": "100"})
+        if stop_loss:
+            cond.append({"order_type": "loss_stop", "side": "sell", "price_scale": f"{stop_loss * 100:g}", "sell_ratio": "100"})
+        if cond:
+            args += ["--condition-orders", json.dumps(cond)] + self._fees()
         return self._data(self._run(args))
+
+    def quote(self, input_token, output_token, amount, slippage=0.15) -> dict:
+        return self._data(self._run(["order", "quote", "--from", self.wallet_address(), "--input-token", input_token,
+                                     "--output-token", output_token, "--amount", str(int(amount)),
+                                     "--slippage", f"{slippage * 100:g}"]))
+
+    def limit_order(self, token, side_type, trigger_price, amount_in=None, amount_pct=None,
+                    slippage=0.15, expire_s=86400) -> dict:
+        """side_type: buy_low / buy_high (spend native) or take_profit / stop_loss (sell token)."""
+        native, _ = NATIVE[self.chain]
+        args = ["order", "strategy", "create", "--from", self.wallet_address(), "--base-token", token,
+                "--quote-token", native, "--order-type", "limit_order", "--sub-order-type", side_type,
+                "--check-price", f"{trigger_price:.12g}", "--slippage", f"{slippage * 100:g}",
+                "--expire-in", str(int(expire_s))]
+        args += ["--amount-in-percent", f"{amount_pct:g}"] if amount_pct is not None else ["--amount-in", str(int(amount_in))]
+        return self._data(self._run(args + self._fees()))
+
+    def limit_orders(self, kind="open") -> list:
+        d = self._data(self._run(["order", "strategy", "list", "--type", kind, "--group-tag", "LimitOrder",
+                                  "--from", self.wallet_address(), "--limit", "50"]))
+        return (d.get("list") or d.get("orders") or []) if isinstance(d, dict) else (d or [])
+
+    def cancel_order(self, order_id, order_type="limit_order") -> dict:
+        return self._data(self._run(["order", "strategy", "cancel", "--from", self.wallet_address(),
+                                     "--order-id", str(order_id), "--order-type", order_type]))
 
     def order_get(self, order_id) -> dict:
         return self._data(self._run(["order", "get", "--order-id", str(order_id)]))
+
+    # Generic read access for the command-center features. Every call still goes through the rate gate.
+    READ_ONLY = {("market", "kline"), ("market", "trending"), ("market", "trenches"), ("market", "signal"),
+                 ("market", "hot-searches"), ("market", "search"), ("token", "info"), ("token", "security"),
+                 ("token", "pool"), ("token", "holders"), ("token", "traders"), ("portfolio", "activity"),
+                 ("portfolio", "stats"), ("portfolio", "profits"), ("portfolio", "token-balance"),
+                 ("portfolio", "created-tokens"), ("portfolio", "holdings"), ("track", "kol"),
+                 ("track", "smartmoney"), ("track", "follow-wallet"), ("callout", "record"),
+                 ("callout", "global"), ("order", "quote"), ("order", "gas-price"), ("cooking", "stats")}
+    NO_CHAIN = {("market", "hot-searches"), ("market", "search"), ("cooking", "stats"), ("callout", "global")}
+
+    def read(self, args: list, chain: bool | None = None):
+        """Run a whitelisted read-only gmgn-cli sub-command and return its JSON (unwrapped)."""
+        key = tuple(args[:2])
+        if key not in self.READ_ONLY:
+            raise GMGNError(f"not an allowed read command: {' '.join(args[:2])}")
+        if chain is None:
+            chain = key not in self.NO_CHAIN
+        return self._data(self._run(list(args), chain=chain))
 
 
 # ── demo market ──────────────────────────────────────────────────────────────
@@ -384,8 +473,18 @@ class DemoClient:
                             maker="".join(r.choice(_B58) for _ in range(8))))
         return out
 
+    def read(self, args: list, chain=None):
+        """Simulated market: no GMGN data for these views. Callers show a 'connect GMGN' state."""
+        raise GMGNError("this view needs live GMGN data. Connect your GMGN key in Settings")
+
     def wallet_address(self):
         return "DEMOWALLET1111111111111111111111111111111111"
+
+    def quote(self, *a, **k):
+        raise GMGNError("quotes need live GMGN data")
+
+    def limit_orders(self, kind="open"):
+        return []
 
     def swap(self, **kw):
         return dict(order_id="DEMO-" + "".join(random.choice(string.digits) for _ in range(6)),

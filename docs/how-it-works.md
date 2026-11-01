@@ -1,5 +1,26 @@
 # How kraken works
 
+## Chains
+
+kraken works on **Solana, BSC, Base and Ethereum**. Pick one with the chain picker in the top bar; every screen then reads that chain. Positions and limit orders remember the chain they were opened on, so they keep being priced and sold on the right chain after you switch. Paste an address from another chain into the search box and kraken detects it and switches for you (0x addresses are checked on BSC, Base and Ethereum).
+
+## CA research and the safety score
+
+The safety score is a Python implementation of GMGN's `gmgn-contract-dd` model. It reads `token info`, `token security` and 15-minute candles, and scores three sections from 100:
+
+- **Contract:** mint/freeze authority (Solana), honeypot, verified source, ownership, blacklist (EVM), taxes, LP lock or burn, liquidity, pool shrinkage, how many tokens the creator launched, duplicated logo, and how much price history exists.
+- **Holders:** top-10 concentration, holder count, and GMGN's chain analysis (creator holdings, bundlers, snipers, rat traders, entrapment traders, bots, fresh wallets, private vaults).
+- **Price:** drawdown from the window high, the worst single candle, halving in 24h, and a volume collapse.
+
+Each field only counts its worst matching tier. Sections are combined 45/35/20 over whatever returned data, GMGN's own rug label caps the score (59 at 50%+, 79 at 30%+), and a honeypot forces 0. The bands are **buyable** (80+), **buyable with conditions** (60+), **not advised** (40+) and **do not buy**. The score is about whether you can buy and sell safely, not whether the price will go up.
+
+Discover's "quick safety" uses the same thresholds on the fields already in each listing row, so the feed costs no extra API calls; open a token for the full score.
+
+## Wallet connection graph
+
+For a wallet, kraken reads who first funded it (exchanges are named, e.g. "Kraken"), its incoming and outgoing transfers (grouped per counterparty, with amounts and dates), the tokens it created and the tokens it buys most. The ten busiest counterparties are looked up to label them (smart money, KOL, dev, sniper, transfer-only wallet) and to spot wallets that share the same funder. Click **Expand connections** on any node to map that wallet too.
+
+
 ## Data source
 
 kraken talks to GMGN only through the public **gmgn-cli** command-line tool, using your own API key. Every call goes through a single rate gate that spaces calls (default 1.2 s apart for the free tier), limits how many run at once, and stops sending after a 429 until the ban expires. Sending during a ban only extends it.
