@@ -48,7 +48,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           SHA="${{ steps.zip.outputs.sha }}"
-          BODY="$(gh release view "$GITHUB_REF_NAME" --json body -q .body)"
+          # drop the section this step added on a previous run, so re-runs don't duplicate it
+          BODY="$(gh release view "$GITHUB_REF_NAME" --json body -q .body | sed '/^\*\*Download:\*\*/,$d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' | sed '${/^---$/d}')"
           printf '%s\n\n---\n**Download:** `%s`  \n**SHA-256:** `%s`  \n**VirusTotal report:** https://www.virustotal.com/gui/file/%s\n\n<sub>The report link matches this exact file by its SHA-256. You can verify it yourself: drop the ZIP on virustotal.com and the same report opens.</sub>\n' \
             "$BODY" "${{ steps.zip.outputs.name }}" "$SHA" "$SHA" > notes.md
           gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
