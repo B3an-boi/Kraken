@@ -92,11 +92,16 @@ class Hunter:
             if safety_check(t, safe):
                 continue
             stats["safe"] += 1
-            if (abs(t.chg_1h) > c["max_chg_1h"] or abs(t.chg_5m) > c["max_chg_5m"] or t.age_min < c["min_age_min"]
-                    or (c["max_age_h"] and t.age_min > c["max_age_h"] * 60) or t.mcap < c["min_mcap"]
-                    or (c["max_mcap"] and t.mcap > c["max_mcap"]) or t.liquidity < c["min_liq"]):
-                continue
-            if floor and t.ath_mcap > 0 and t.mcap / t.ath_mcap > c["max_mc_vs_ath"]:
+            # prefilter, with the reason counted so the funnel shows what's cutting coins
+            pf = ("market cap too low" if t.mcap < c["min_mcap"] else
+                  "market cap too high" if c["max_mcap"] and t.mcap > c["max_mcap"] else
+                  "liquidity too low" if t.liquidity < c["min_liq"] else
+                  "too young" if t.age_min < c["min_age_min"] else
+                  "too old" if c["max_age_h"] and t.age_min > c["max_age_h"] * 60 else
+                  "already moving" if abs(t.chg_1h) > c["max_chg_1h"] or abs(t.chg_5m) > c["max_chg_5m"] else
+                  "still near its high" if floor and t.ath_mcap > 0 and t.mcap / t.ath_mcap > c["max_mc_vs_ath"] else None)
+            if pf:
+                why[pf] += 1
                 continue
             slop = self._slop(r, c)
             if slop:
