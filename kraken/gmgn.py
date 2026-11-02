@@ -210,9 +210,11 @@ class LiveClient:
     def _data(d):
         return d.get("data", d) if isinstance(d, dict) and d.get("data") is not None else d
 
-    def trending(self, interval="1h", limit=100, order_by="volume") -> list[dict]:
+    def trending(self, interval="1h", limit=100, order_by="volume", ranges: dict | None = None) -> list[dict]:
+        """ranges = server-side bounds, e.g. {"min-history-highest-marketcap": 50000, "max-marketcap": 300000}."""
+        extra = [x for k, v in (ranges or {}).items() if v for x in (f"--{k}", str(int(v)))]
         d = self._data(self._run(["market", "trending", "--interval", interval, "--order-by", order_by,
-                                  "--direction", "desc", "--limit", str(limit), "--filter", "not_wash_trading"]))
+                                  "--direction", "desc", "--limit", str(limit), "--filter", "not_wash_trading", *extra]))
         return (d.get("rank") or d.get("tokens") or []) if isinstance(d, dict) else []
 
     def kline(self, addr, resolution="1m", minutes=120) -> list[dict]:
@@ -456,7 +458,7 @@ class DemoClient:
                     buy_tax=0, sell_tax=0, smart_degen_count=t["sm"], renowned_count=t["kol"],
                     sniper_count=int(r.uniform(0, 30)), top70_sniper_hold_rate=r.uniform(0, 0.3))
 
-    def trending(self, interval="1h", limit=100, order_by="volume"):
+    def trending(self, interval="1h", limit=100, order_by="volume", ranges=None):
         rows = [self._row(t) for t in self.tokens if t["launch"] < time.time() / 60 - 5]
         rows.sort(key=lambda x: -x["volume"])
         return rows[:limit]

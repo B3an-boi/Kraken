@@ -133,7 +133,7 @@ async function loadHunter(){
   $('#hFunnel').innerHTML=s.pool!=null?`<span>pool <b>${s.pool}</b></span><i>→</i><span>safe <b>${s.safe}</b></span><i>→</i><span>prefilter <b>${s.prefilter}</b></span><i>→</i><span>charted <b>${s.charted}</b></span><i>→</i><span>bases <b>${s.found}</b></span>`:'';
   $('#hWhy').innerHTML=Object.entries(s.why||{}).map(([k,v])=>`<span class="why">${esc(k)} · ${v}</span>`).join('');
   $('#bHunter').textContent=h.results.length;
-  $('#hCards').innerHTML=h.results.length?h.results.map(hunterCard).join(''):`<div class="empty card" style="grid-column:1/-1"><div class="big">🌊</div>${h.last_scan?'No bases right now. The rejection reasons are above; loosen them in Settings → Base Hunter.':'No scan yet. Click <b>Scan now</b>.'}</div>`;
+  $('#hCards').innerHTML=h.results.length?h.results.map(hunterCard).join(''):`<div class="empty card" style="grid-column:1/-1"><div class="big">🌊</div>${h.last_scan?'No bases right now. The rejection reasons are above; try the Wide net preset above for more finds.':'No scan yet. Click <b>Scan now</b>.'}</div>`;
   if(ST.settings){$('#hAuto').checked=ST.settings.hunter.auto;$('#hSetup').value=ST.settings.hunter.setup;}
 }
 $('#hScan').onclick=async()=>{try{await api('/api/hunter/scan',{method:'POST'});toast('Scanning…');setTimeout(loadHunter,800)}catch(e){toast(e.message,true)}};
@@ -261,12 +261,12 @@ const SPEC={
   ['auto','Auto-scan','bool','Scans in the background and feeds the learning loop.'],
   ['auto_every_min','Scan every (min)','int','',1],['scan_n','Charts per scan','int','Each chart is 1 GMGN API call.',5],
   ['min_base_min','Min base length (min)','int','How long the flat range must hold.',5],['max_range','Max base range','pct','(top − low) / mid of the base.',1],
-  ['min_pump','Min launch pump ×','num','Peak ÷ pre-peak low. The most common rejection.',0.5],['min_retrace','Min retrace','pct','How far the base sits below the peak.',5],
+  ['min_pump','How big the first pump was (×)','num','Peak ÷ the low before it. 3× = it tripled.',0.5],['min_retrace','How far it dumped from the top','pct','70% = now sitting at 30% of its peak.',5],
   ['max_vol_ratio','Base vol ≤ % of pump','pct','Volume must have dried up.',5],['near_low','Base ≤ % above the low','x','Base low vs lowest low after the peak.',1],
   ['max_mc_vs_ath','MC ≤ % of ATH','pct','Prefilter: off its highs.',5],['min_usd_per_min_floor','Min $/min in base (floor)','num','Below = dead.',5],
   ['min_usd_per_min_any','Min $/min (any setup)','num','',10],
-  ['min_mcap','Min market cap $','num','',1000],['max_mcap','Max market cap $ (0 = any)','num','',10000],
-  ['max_age_h','Max age h (0 = any)','num','',1],['min_age_min','Min age (min)','num','',5],['min_liq','Min liquidity $','num','',1000],
+  ['min_mcap','Smallest market cap','num','Floors usually sit at $5K–$30K.',1000],['max_mcap','Max market cap $ (0 = any)','num','',10000],
+  ['max_age_h','Max age h (0 = any)','num','',1],['min_age_min','Min age (min)','num','',5],['min_liq','Smallest liquidity','num','Below this, buys and sells move the price a lot.',1000],
   ['max_chg_1h','Max 1h move','pct','Skip coins already moving.',5],['max_chg_5m','Max 5m move','pct','',1],
   ['max_dev_launches','Skip dev with ≥ launches (0 = off)','int','Serial launchers who spam hundreds of coins.',10],['max_logo_dups','Skip logo reused ≥ times (0 = off)','int','Copycat coins with a recycled image.',1],
   ['min_buys_1h','Min buys in last hour','int','Fewer = dead, nobody is buying.',1],['skip_wash','Skip wash-traded coins','bool','GMGN flagged fake volume.'],
@@ -298,6 +298,28 @@ const SPEC={
  rate:['GMGN rate limits',[
   ['min_gap_s','Seconds between calls','num','Free tier ≈ 1.2 · Plus ≈ 0.15',0.05],['max_inflight','Parallel calls','int','Free tier 1 · Plus 4',1]]],
 };
+/* sliders: [min,max,step] in the units the field shows (% for percentages) */
+const RANGE={
+  'risk.buy_size':[0.01,5,0.01],'risk.slippage':[1,50,1],'risk.max_positions':[1,50,1],'risk.max_exposure':[0.1,100,0.1],'risk.daily_loss_limit':[0.1,50,0.1],
+  'risk.stop_loss':[5,90,5],'risk.take_profit':[10,1000,10],'risk.monitor_every_s':[5,300,5],
+  'autotrade.min_score':[0,100,1],'autotrade.size':[0.01,5,0.01],'autotrade.tp':[5,300,5],'autotrade.sl':[5,90,1],'autotrade.max_hold_min':[10,720,10],
+  'autotrade.max_open':[1,25,1],'autotrade.daily_loss_limit':[0.05,20,0.05],'autotrade.cooldown_h':[0,48,1],'autotrade.unlock_trades':[30,500,10],'autotrade.unlock_profit_factor':[1,3,0.1],
+  'hunter.auto_every_min':[2,60,1],'hunter.scan_n':[5,100,5],'hunter.min_base_min':[10,240,5],'hunter.max_range':[2,50,1],'hunter.min_pump':[1.5,20,0.5],
+  'hunter.min_retrace':[20,95,5],'hunter.max_vol_ratio':[5,100,5],'hunter.near_low':[0,100,5],'hunter.max_mc_vs_ath':[5,100,5],'hunter.min_usd_per_min_floor':[0,200,5],
+  'hunter.min_usd_per_min_any':[0,1000,10],'hunter.min_mcap':[0,200000,1000],'hunter.max_mcap':[0,20000000,100000],'hunter.max_age_h':[0,168,1],'hunter.min_age_min':[0,240,5],
+  'hunter.min_liq':[0,100000,1000],'hunter.max_chg_1h':[5,200,5],'hunter.max_chg_5m':[1,50,1],'hunter.max_dev_launches':[0,1000,10],'hunter.max_logo_dups':[0,50,1],
+  'hunter.min_buys_1h':[0,100,1],'hunter.label_tp':[5,200,5],'hunter.label_sl':[5,90,5],'hunter.label_horizon_min':[15,480,15],
+  'screen.limit':[10,100,10],'screen.auto_every_min':[2,60,1],'screen.min_score':[0,100,5],'screen.min_smart_money':[0,20,1],'screen.min_liquidity':[0,200000,1000],
+  'screen.min_mcap':[0,1000000,5000],'screen.max_mcap':[0,50000000,100000],'screen.max_top10':[5,100,5],'screen.max_dev_hold':[0,50,1],'screen.max_bundler':[0,100,5],
+  'screen.max_rug':[0,100,5],'screen.max_buy_tax':[0,50,1],'screen.max_sell_tax':[0,50,1],'alerts.min_score':[0,100,5],'rate.min_gap_s':[0.05,3,0.05],'rate.max_inflight':[1,8,1]};
+const BASIC=new Set(['risk.buy_size','risk.slippage','risk.max_positions','risk.daily_loss_limit',
+  'autotrade.enabled','autotrade.min_score','autotrade.size','autotrade.tp','autotrade.sl','autotrade.max_hold_min',
+  'hunter.setup','hunter.auto','hunter.min_mcap','hunter.min_liq','hunter.min_pump','hunter.min_retrace',
+  'screen.auto','screen.min_score','screen.min_smart_money','screen.require_renounced',
+  'alerts.enabled','alerts.on_floor','alerts.on_exit','alerts.ntfy_topic','alerts.telegram_token','alerts.telegram_chat_id','alerts.discord_webhook',
+  'rate.min_gap_s','rate.max_inflight']);
+const ORDER=['risk','autotrade','hunter','screen','alerts','rate'];
+const fmtSl=(sec,key,kind,v)=>{if(v===''||v==null)return '—';const n=+v;if(kind==='pct'||kind==='x')return n+'%';if(/mcap|liq|usd/.test(key))return n>=1e6?'$'+(n/1e6).toFixed(n>=1e7?0:1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;return String(n)};
 const toUi=(k,v)=>k==='pct'?+(v*100).toFixed(2):k==='x'?+((v-1)*100).toFixed(2):v;
 const fromUi=(k,v)=>k==='pct'?v/100:k==='x'?1+v/100:v;
 function fieldHTML(sec,[key,label,kind,help,step]){
@@ -305,10 +327,19 @@ function fieldHTML(sec,[key,label,kind,help,step]){
   if(kind==='bool')inp=`<select id="${id}"><option value="true">On</option><option value="false">Off</option></select>`;
   else if(kind.startsWith('select:'))inp=`<select id="${id}">${kind.slice(7).split('|').map(o=>{const[v,l]=o.split('=');return `<option value="${esc(v)}">${esc(l||v)}</option>`}).join('')}</select>`;
   else if(kind==='text'||kind==='secret')inp=`<input type="${kind==='secret'?'password':'text'}" id="${id}" autocomplete="off" spellcheck="false">`;
+  else if(RANGE[sec+'.'+key]){const[mn,mx,st]=RANGE[sec+'.'+key];
+    inp=`<div class="sl"><input type="range" min="${mn}" max="${mx}" step="${st}" data-for="${id}" aria-label="${esc(label)}"><input type="number" id="${id}" step="${st}" class="slnum"></div>`}
   else inp=`<input type="number" id="${id}" step="${step||'any'}">`;
-  return `<div class="f ${kind==='text'||kind==='secret'?'wide':''}"><label for="${id}">${esc(label)}${kind==='pct'||kind==='x'?' %':''}</label>${inp}${help?`<small>${esc(help)}</small>`:''}</div>`;
+  return `<div class="f ${kind==='text'||kind==='secret'?'wide':''}"><label for="${id}">${esc(label)}${kind==='pct'||kind==='x'?' %':''}<b class="slv" data-v="${id}"></b></label>${inp}${help?`<small>${esc(help)}</small>`:''}</div>`;
 }
-$('#setGrid').innerHTML=Object.entries(SPEC).map(([sec,[title,fields]])=>`<div class="card"><div class="row" style="justify-content:space-between"><h3>${title}</h3><div class="row">${sec==='alerts'?'<button class="btn small" id="alertTest">Send test</button>':''}<button class="btn small" data-reset="${sec}">Reset</button></div></div><div class="fields">${fields.map(f=>fieldHTML(sec,f)).join('')}</div></div>`).join('');
+const SECHELP={risk:'Your manual buys and the safety limits on them.',autotrade:'Base Hunter buying by itself. Paper until the record unlocks real trading.',hunter:'What counts as a post-pump floor. Easiest: pick a preset on the Base Hunter page.',
+  screen:'The momentum screener and the safety gates every scan uses.',alerts:'Phone or chat notifications.',rate:'How fast kraken may call GMGN. Plus plan: 0.15 s and 4 parallel.'};
+$('#setGrid').innerHTML=ORDER.map(sec=>{const[title,fields]=SPEC[sec],b=fields.filter(f=>BASIC.has(sec+'.'+f[0])),a=fields.filter(f=>!BASIC.has(sec+'.'+f[0]));
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${title}</h3><div class="row">${sec==='alerts'?'<button class="btn small" id="alertTest">Send test</button>':''}<button class="btn small" data-reset="${sec}">Reset</button></div></div>
+    <div class="sub" style="margin:2px 0 12px">${SECHELP[sec]||''}</div><div class="fields">${b.map(f=>fieldHTML(sec,f)).join('')}</div>
+    ${a.length?`<details class="adv"><summary>Advanced · ${a.length} more</summary><div class="fields">${a.map(f=>fieldHTML(sec,f)).join('')}</div></details>`:''}</div>`}).join('');
+function syncSl(el){const r=document.querySelector(`input[type=range][data-for="${el.id}"]`);if(r&&el.value!=='')r.value=el.value;const v=document.querySelector(`.slv[data-v="${el.id}"]`);if(v){const m=el.id.match(/^set_([a-z]+)_(.+)$/);const f=m&&(SPEC[m[1]][1].find(x=>x[0]===m[2])||[]);v.textContent=r&&m?fmtSl(m[1],m[2],f[2],el.value):''}}
+$('#setGrid').addEventListener('input',e=>{const r=e.target;if(r.type==='range'&&r.dataset.for){const n=$('#'+r.dataset.for);n.value=r.value;n.dispatchEvent(new Event('input',{bubbles:true}))}else if(r.id&&r.id.startsWith('set_'))syncSl(r)});
 function readField(sec,[key,,kind]){
   const v=$(`#set_${sec}_${key}`).value;
   if(kind==='bool')return v==='true';
@@ -319,8 +350,9 @@ function fillSettings(s){
   for(const[sec,[,fields]]of Object.entries(SPEC))for(const[key,,kind]of fields){
     const el=$(`#set_${sec}_${key}`),v=s[sec][key];
     el.value=kind==='bool'?String(v):(typeof v==='number'?toUi(kind,v):v);
-    el.dataset.orig=el.value;el.classList.remove('changed');
+    el.dataset.orig=el.value;el.classList.remove('changed');syncSl(el);
   }
+  renderPresets();
   $('#saveBar').classList.remove('on');
 }
 function markChanged(e){const el=e.target;if(!el.id||!el.id.startsWith('set_'))return;el.classList.toggle('changed',el.value!==el.dataset.orig);$('#saveBar').classList.toggle('on',!!document.querySelector('#setGrid .changed'))}
@@ -402,3 +434,20 @@ async function refresh(force){
   }catch(e){$('#srcTxt').textContent='backend offline';$('#srcPill').className='pill';}
 }
 /* startup lives at the end of cc.js, which loads after this file */
+
+/* Base Hunter presets: one click instead of twenty settings */
+const PRESETS=[
+  {id:'picky',name:'Picky',desc:'Fewer finds, cleaner setups: big pump, deep dump, long tight floor, real liquidity.',
+   v:{setup:'floor',min_pump:4,min_retrace:0.70,max_range:0.12,min_base_min:60,max_vol_ratio:0.15,min_mcap:15000,min_liq:8000,min_buys_1h:10,max_dev_launches:50,max_logo_dups:3}},
+  {id:'balanced',name:'Balanced',desc:'The default. A good mix of quality and enough finds to learn from.',
+   v:{setup:'floor',min_pump:2.5,min_retrace:0.60,max_range:0.18,min_base_min:45,max_vol_ratio:0.25,min_mcap:8000,min_liq:5000,min_buys_1h:5,max_dev_launches:100,max_logo_dups:5}},
+  {id:'wide',name:'Wide net',desc:'Most finds. Looser floors and smaller coins: fastest learning, more noise.',
+   v:{setup:'floor',min_pump:2,min_retrace:0.50,max_range:0.25,min_base_min:30,max_vol_ratio:0.40,min_mcap:5000,min_liq:3000,min_buys_1h:3,max_dev_launches:200,max_logo_dups:10}}];
+function renderPresets(){
+  const h=ST.settings&&ST.settings.hunter,el=$('#hPresets');if(!h||!el)return;
+  const on=PRESETS.find(p=>Object.entries(p.v).every(([k,v])=>typeof v==='number'?Math.abs(h[k]-v)<1e-9:h[k]===v));
+  el.innerHTML=PRESETS.map(p=>`<button class="preset ${on&&on.id===p.id?'on':''}" role="radio" aria-checked="${!!(on&&on.id===p.id)}" data-preset="${p.id}"><b>${p.name}</b><span>${p.desc}</span></button>`).join('')+
+    (on?'':'<div class="sub" style="align-self:center">Custom settings. Pick a preset to switch, or fine-tune in Settings → Base Hunter.</div>');
+}
+$('#hPresets').onclick=async e=>{const b=e.target.closest('[data-preset]');if(!b)return;const p=PRESETS.find(x=>x.id===b.dataset.preset);
+  await saveQuick({hunter:p.v});renderPresets();toast(p.name+' preset on. Applies from the next scan.')};

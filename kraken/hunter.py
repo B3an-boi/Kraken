@@ -79,6 +79,20 @@ class Hunter:
                 if r.get("address") and r["address"] not in seen:
                     seen.add(r["address"])
                     rows.append(r)
+        # coins that once pumped big and now trade far below that: exactly what a post-pump floor is
+        if floor:
+            for iv in ("24h", "6h"):
+                try:
+                    got = client.trending(interval=iv, limit=100, order_by="history_highest_market_cap",
+                                          ranges={"min-history-highest-marketcap": max(50000, c["min_mcap"] * 3),
+                                                  "min-marketcap": c["min_mcap"], "max-marketcap": c["max_mcap"] or None,
+                                                  "min-liquidity": c["min_liq"]})
+                except Exception:
+                    got = []
+                for r in got:
+                    if r.get("address") and r["address"] not in seen:
+                        seen.add(r["address"])
+                        rows.append(r)
         # young launchpad coins (just bonded / almost bonded) are where post-pump floors form
         for r in trench_rows(client):
             if r["address"] not in seen:

@@ -286,12 +286,28 @@ const TV={
         MAS.map(([n,col])=>{const v=maV[n].get(b.time);return v!=null?`<span style="color:${col}">MA${n} <b>${fmtPx(v)}</b></span>`:''}).join('')};
     show(last,bars.length-1);
     const idx=new Map(bars.map((b,i)=>[b.time,i]));
-    chart.subscribeCrosshairMove(p=>{const b=p&&p.time!=null?bars[idx.get(p.time)]:null;show(b||last,b?idx.get(p.time):bars.length-1)});
+    chart.subscribeCrosshairMove(p=>{const b=p&&p.time!=null?bars[idx.get(p.time)]:null;this.hovering=!!b;show(b||bars[bars.length-1],b?idx.get(p.time):bars.length-1)});
+    // live: pull fresh candles on a timer and update the last bars in place (no reload, view stays put)
+    Object.assign(this,{idx,maS,maV,MAS,ma,showBar:show,closes});
+    clearInterval(this.liveT);const every={'1m':10,'5m':20,'15m':30,'1h':60,'4h':120}[res]||30;
+    this.liveT=setInterval(()=>this.tick(),every*1000);
     this.avgLine=null;this.ordLines=[];this.pvLine=null;this.flagLines=[];this._bubSub=null;
     this.trade();this.syncPos();
     this.flagUI();
     chart.subscribeClick(p=>{if(this.tab!=='lmt'||!p||!p.point)return;const px=cs.coordinateToPrice(p.point.y);if(px>0){$('#tqPx').value=+px.toPrecision(5);this.preview()}});
     clearInterval(this.timer);this.timer=setInterval(()=>{if(CC.token===this.addr&&document.body.contains($('#tvBox')))this.syncPos();else clearInterval(this.timer)},8000);
+  },
+  async tick(){
+    if(CC.token!==this.addr||!document.body.contains($('#tvBox'))||document.hidden){if(CC.token!==this.addr)clearInterval(this.liveT);return}
+    const res=this.res;let d;try{d=await api(`/api/candles/${encodeURIComponent(this.addr)}?res=${res}`)}catch(e){return}
+    if(res!==this.res||!this.cs)return;
+    const bars=this.bars,lastT=bars[bars.length-1].time;let grew=false;
+    for(const [t,o,h,l,c] of d.candles){if(t<lastT)continue;const b={time:t,open:o,high:h,low:l,close:c};
+      if(t===lastT){bars[bars.length-1]=b;this.closes[this.closes.length-1]=c}else{bars.push(b);this.closes.push(c);this.idx.set(t,bars.length-1);grew=true}
+      this.cs.update(b)}
+    for(const [n] of this.MAS){const data=this.ma(n);this.maV[n]=new Map(data.map(x=>[x.time,x.value]));const lastPt=data[data.length-1];if(lastPt)this.maS[n].update(lastPt)}
+    if(!this.hovering)this.showBar(bars[bars.length-1],bars.length-1);
+    if(grew)this.syncPos();
   },
   /* corner trade box: buy adds to the position (weighted average entry), sells take 25/50/100% */
   trade(){
