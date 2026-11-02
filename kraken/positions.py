@@ -188,7 +188,9 @@ class Positions:
                     hit = ("take_profit" if p.get("tp") and p["pnl_pct"] >= p["tp"] else
                            "stop_loss" if p.get("sl") and p["pnl_pct"] <= -p["sl"] else None)
                     if hit:
-                        p.update(status="closed", exit_price=price, exit_ts=time.time(), exit_reason=hit.replace("_", "-"))
+                        p.setdefault("fills", []).append(dict(ts=time.time(), side="sell", size=p["size"], price=price, tx=None, pct=100))
+                        p.update(status="closed", exit_price=price, exit_ts=time.time(), exit_reason=hit.replace("_", "-"),
+                                 pnl=p.get("realized", 0.0) + p["pnl"])
                         new.append(dict(position=p, kind=hit, msg=f"paper {hit.replace('_', '-')} filled at {p['pnl_pct']:+.0%}", ts=time.time()))
                         continue
                 sl, tp = p.get("sl") or r["stop_loss"], p.get("tp") or r["take_profit"]

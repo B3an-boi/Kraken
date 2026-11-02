@@ -15,6 +15,8 @@ from .config import DATA, ROOT, Settings
 from .gmgn import NATIVE, DemoClient, GMGNError, LiveClient, RateGate, key_status
 from .hunter import Hunter
 from .positions import PaperOrders, Positions, RiskError
+from .autotrade import AutoTrader
+from .replay import Replay
 
 S = Settings()
 GATE = RateGate(S["rate"]["min_gap_s"], S["rate"]["max_inflight"])
@@ -42,6 +44,10 @@ def event(kind: str, msg: str, **extra):
             fh.write(json.dumps(e, ensure_ascii=False) + "\n")
     except OSError:
         pass
+
+
+AUTO = AutoTrader(S, POS, event)
+REPLAY = Replay(HUNTER, S, event)
 
 
 def is_live() -> bool:
@@ -101,6 +107,9 @@ def get_settings():
 @app.post("/api/settings")
 def set_settings(patch: dict):
     try:
+        at = patch.get("autotrade") or {}
+        if at.get("live") and not AUTO.gate()["unlocked"]:
+            raise ValueError("auto-trade can't go live yet: the paper record hasn't cleared the unlock bar (see Auto-trade)")
         if patch.get("mode") == "LIVE":
             if not is_live():
                 raise ValueError("LIVE needs gmgn-cli and a GMGN API key (no key found, so this is a simulated market)")
@@ -166,6 +175,7 @@ def _run_hunter():
         r = HUNTER.scan(client())
         st = r["stats"]
         event("hunter", f"{st['setup']}: {st['pool']} → {st['found']} bases", stats=st)
+        AUTO.on_scan(client(), r["results"], S["chain"])
         a = S.get("alerts")
         if a["on_floor"]:
             for o in r["results"]:
@@ -178,9 +188,21 @@ def _run_hunter():
         event("error", f"hunter scan failed: {e}")
 
 
+@app.get("/api/autotrade")
+def get_autotrade():
+    return AUTO.state()
+
+
 @app.get("/api/hunter")
 def get_hunter():
-    return HUNTER.public_state()
+    return dict(HUNTER.public_state(), replay=REPLAY.state)
+
+
+@app.post("/api/hunter/replay")
+def start_replay():
+    if not client().live:
+        raise HTTPException(400, "replay needs a GMGN API key (live data)")
+    return REPLAY.start(client(), S["chain"])
 
 
 _SNAP_CACHE: dict = {}
@@ -582,6 +604,7 @@ def loop():
                 sigs = []
                 for ch in {p["chain"] for p in POS.open_list()}:      # each position is priced on its own chain
                     sigs += POS.monitor(client(ch), chain=ch)
+                AUTO.on_monitor(client)
                 for sig in sigs:
                     p = sig["position"]
                     event("exit_signal", f"{p['symbol']}: {sig['msg']}", id=p["id"])

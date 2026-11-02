@@ -283,7 +283,7 @@ class SampleStore:
         lab = self.labeled()
         wins = sum(l["win"] for _, l in lab)
         hi = [l for s, l in lab if s.get("rule", 0) >= 60]
-        return dict(samples=len(self.samples), labeled=len(lab), wins=wins,
+        return dict(samples=len(self.samples), labeled=len(lab), wins=wins, replayed=sum(1 for s, _ in lab if s.get("replay")),
                     win_rate=(wins / len(lab)) if lab else None,
                     hi_score_n=len(hi), hi_score_win_rate=(sum(l["win"] for l in hi) / len(hi)) if hi else None,
                     pending=len(self.samples) - len(self.labels))

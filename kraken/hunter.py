@@ -11,6 +11,28 @@ from .config import DATA
 from .screener import Token, safety_check
 
 
+def trench_rows(client, limit=80) -> list[dict]:
+    """GMGN's just-bonded and almost-bonded feeds, with field names matched to trending rows."""
+    if not hasattr(client, "read"):
+        return []
+    try:
+        d = client.read(["market", "trenches", "--type", "completed", "--type", "near_completion", "--limit", str(limit)])
+    except Exception:
+        return []
+    out = []
+    for bucket in ("completed", "near_completion"):
+        for r in (d or {}).get(bucket) or []:
+            if not r.get("address"):
+                continue
+            r = dict(r)
+            r.setdefault("creation_timestamp", r.get("created_timestamp") or r.get("open_timestamp"))
+            r.setdefault("bundler_rate", r.get("bundler_trader_amount_rate"))
+            if r.get("market_cap") in (None, "") and r.get("usd_market_cap") not in (None, ""):
+                r["market_cap"] = r["usd_market_cap"]
+            out.append(r)
+    return out
+
+
 class Hunter:
     def __init__(self, settings):
         self.settings = settings
@@ -57,6 +79,11 @@ class Hunter:
                 if r.get("address") and r["address"] not in seen:
                     seen.add(r["address"])
                     rows.append(r)
+        # young launchpad coins (just bonded / almost bonded) are where post-pump floors form
+        for r in trench_rows(client):
+            if r["address"] not in seen:
+                seen.add(r["address"])
+                rows.append(r)
         stats = dict(pool=len(rows), safe=0, prefilter=0, charted=0, found=0, setup=c["setup"], why={})
         why = Counter()
         pre = []
@@ -202,7 +229,7 @@ class Hunter:
 
     def public_state(self) -> dict:
         labeled = self.store.labeled()
-        recent = [dict(id=s["id"], chain=s.get("chain", "sol"), price=s.get("price"), symbol=s["symbol"], address=s["address"],
+        recent = [dict(id=s["id"], chain=s.get("chain", "sol"), price=s.get("price"), symbol=s["symbol"], address=s["address"], replay=bool(s.get("replay")),
                        ts=s["ts"], rule=s.get("rule"), p=s.get("p"),
                        win=l["win"], max_up=l.get("max_up"), max_dd=l.get("max_dd"), end_ret=l.get("end_ret"))
                   for s, l in labeled[-25:]][::-1]

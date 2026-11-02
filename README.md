@@ -103,7 +103,7 @@ cd Kraken
 | **Base Hunter** | Finds coins resting in a quiet floor after their first pump, before the breakout. Skips slop: serial-launcher devs, copycat logos, wash-traded and dead coins. Every find is graded 2 hours later so the **Learning** tab can train a model on your own results, and the **⚑ Hunter flags** toggle on any token chart shows a dot where Base Hunter flagged it. |
 | **Screener** | The momentum screener with safety gates and a transparent score. |
 | **Positions** | One-click buys and sells. **SHADOW** (default) is paper trading at live prices; **LIVE** sends real swaps through gmgn-cli. Take-profit and stop-loss, limit orders (buy the dip, buy the breakout, sell at target or stop), risk limits and exit alerts. |
-| **Learning** | Model progress and what-if backtests over your labeled Base Hunter snapshots. |
+| **Learning** | Model progress, what-if backtests over your labeled Base Hunter snapshots, **Replay history** (walks recent coins' past candles to label hundreds of setups in minutes, price and volume only), and **Auto-trade**: Base Hunter finds bought automatically on paper with a take-profit, stop-loss and time limit, a running scorecard, and real trading that unlocks only after the paper record proves itself. |
 | **Alerts** | ntfy, Telegram or Discord for new finds and exit signals. |
 
 Every wallet, token and transaction links to **Solscan** (BscScan, BaseScan or Etherscan on the other chains) and GMGN.
@@ -141,7 +141,7 @@ More detail: **[How it works](docs/how-it-works.md)** · **[Settings reference](
 - **Local only.** The server binds to `127.0.0.1` and rejects API requests from other machines.
 - **Keys stay on your computer** in gmgn-cli's own env file (`~/.config/gmgn/.env`). kraken never sends them anywhere except to gmgn-cli.
 - **Paper by default.** LIVE mode needs both an API key and a signing key, and asks you to confirm. Every real buy and sell asks again.
-- **Human in the loop.** kraken never opens or closes a trade on its own. Exit signals only alert you.
+- **Human in the loop by default.** kraken never opens or closes a trade on its own unless you turn on **Auto-trade** (Learning tab). Auto-trade starts on paper, and real auto-trading stays locked until the paper record clears the bar you set (100 trades, positive P/L, profit factor 1.3 by default) *and* you switch it on yourself.
 - **Rate-limit aware.** Every GMGN call goes through one gate that spaces calls and backs off after a 429, so your key doesn't get banned.
 
 ## Project layout

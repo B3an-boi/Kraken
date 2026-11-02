@@ -192,18 +192,45 @@ $('#oTbl').onclick=async e=>{const b=e.target.closest('[data-cxl]');if(!b)return
 /* learning */
 const BT=[['min_score','Min rule score','',1],['max_range','Max base range %','pct',1],['min_base_len','Min base (min)','',5],['min_pump','Min pump ×','',0.5],['min_retrace','Min retrace %','pct',5],['max_vol_ratio','Max vol / pump %','pct',5],['tp','Take profit %','pct',5],['sl','Stop loss %','pct',5]];
 $('#btForm').innerHTML=BT.map(([k,l,,st])=>`<div class="f"><label for="bt_${k}">${l}</label><input type="number" step="${st}" id="bt_${k}" placeholder="any"></div>`).join('');
+async function loadAuto(){
+  let a;try{a=await api('/api/autotrade')}catch(e){return}
+  const c=a.settings,r=a.paper,lv=a.live,g=a.gate,nat=chainNow()==='sol'?'SOL':chainNow()==='bsc'?'BNB':'ETH';
+  $('#atOn').checked=!!c.enabled;
+  $('#atOn').onchange=e=>saveQuick({autotrade:{enabled:e.target.checked}}).then(loadAuto);
+  const pf=x=>x==null?'—':x===Infinity||x>=999?'∞':x.toFixed(2);
+  $('#atTiles').innerHTML=[['Paper trades',r.trades,`${r.open} open now`],['Win rate',r.win_rate==null?'—':pct(r.win_rate),`${r.wins} wins`],
+    ['Paper P/L',`${r.pnl>=0?'+':''}${r.pnl.toFixed(3)}`,nat],['Avg per trade',r.avg_ret==null?'—':spct(r.avg_ret,1),'of the size'],
+    ['Profit factor',pf(r.profit_factor),'wins ÷ losses'],['Max drawdown',r.max_drawdown.toFixed(3),nat]]
+    .map(([k,v,s])=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+  $('#atGate').innerHTML=g.checks.map(x=>`<div class="gck ${x.ok?'ok':''}"><i>${x.ok?'✓':''}</i>${esc(x.name)}<span>${x.have==null?'—':x.have}</span></div>`).join('');
+  $('#atLive').innerHTML=!g.unlocked?'<div class="sub">Live auto-trading stays locked until all three are checked.</div>'
+    :`<label class="chk"><input type="checkbox" id="atLiveOn" ${c.live?'checked':''}> <b>Auto-trade with real funds</b></label><div class="sub" style="margin-top:4px">${a.live_active?'<span class="down">ON: auto-trades are real swaps.</span>':c.live?'Also switch kraken to LIVE (top right) for this to take effect.':'Off. Auto-trades stay on paper.'}</div>`+
+      (lv.trades?`<div class="sub" style="margin-top:6px">Live record: ${lv.trades} trades · ${lv.win_rate==null?'—':pct(lv.win_rate)} wins · ${lv.pnl>=0?'+':''}${lv.pnl.toFixed(3)} ${nat}</div>`:'');
+  const lo=$('#atLiveOn');if(lo)lo.onchange=async e=>{if(e.target.checked&&!(await confirmDlg('Auto-trade with real funds?',`kraken will buy Base Hunter finds by itself with <b>${c.size} ${nat}</b> each, up to ${c.max_open} at a time, and sell at +${pct(c.tp)}, −${pct(c.sl)} or after ${c.max_hold_min} min. It pauses for 24h after losing ${c.daily_loss_limit} ${nat} in a day. Real swaps, no confirmation per trade.`,'Turn on'))){e.target.checked=false;return}saveQuick({autotrade:{live:e.target.checked}}).then(loadAuto)};
+  $('#atTbl').innerHTML=`<thead><tr><th>Token</th><th>Mode</th><th class="num">Score</th><th class="num">P/L</th><th>Exit</th><th>When</th></tr></thead><tbody>`+(a.recent.length?a.recent.map(x=>`<tr><td><a href="#" data-tok="${esc(x.address)}"><b>${esc(x.symbol)}</b></a></td><td><span class="tag ${x.mode==='LIVE'?'bad':''}">${x.mode==='LIVE'?'live':'paper'}</span></td><td class="num">${x.score??'—'}</td><td class="num ${(x.pnl_pct||0)>=0?'up':'down'}">${spct(x.pnl_pct||0,0)}</td><td class="sub">${x.status==='open'?'open':esc(x.reason||'closed')}</td><td class="sub">${ago(x.entry_ts)}</td></tr>`).join('')
+    :`<tr><td colspan="6"><div class="empty">${c.enabled?'Waiting for the next Base Hunter find with score ≥ '+c.min_score+'.':'Turn on Auto paper-trade to start building a record.'}</div></td></tr>`)+'</tbody>';
+  $('#atRule').innerHTML=`Buys finds with score ≥ <b>${c.min_score}</b> · ${c.size} ${nat} each · TP +${pct(c.tp)} · SL −${pct(c.sl)} · sells after ${c.max_hold_min} min · max ${c.max_open} open · change in <a href="#" data-v-go="settings">Settings → Auto-trade</a>. Needs Base Hunter auto-scan on.`;
+}
 async function loadLearn(){
+  loadAuto();
   const h=await api('/api/hunter');const L=h.learn,m=h.model,lab=h.label;
   $('#lTiles').innerHTML=[['Snapshots',L.samples,`${L.pending} waiting for their ${lab.horizon_min}m outcome`],['Labeled',L.labeled,`win = +${pct(lab.tp)} before −${pct(lab.sl)}`],['Win rate',pct(L.win_rate),`${L.wins} wins`],['Score ≥ 60 wins',pct(L.hi_score_win_rate),`${L.hi_score_n} snapshots`],['Model AUC',m.auc!=null?m.auc.toFixed(2):'—',m.base_auc!=null?`rule score ${m.base_auc.toFixed(2)} · 0.5 = coin flip`:'0.5 = coin flip'],['Model say',Math.round((h.blend||0)*100)+'%','weight in the final score']]
     .map(([k,v,s])=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   const need=h.min_labeled||40;
   $('#lProg').style.width=Math.min(100,L.labeled/need*100)+'%';
+  const rp=h.replay||{};
+  $('#lReplay').disabled=!!rp.running;$('#lReplay').textContent=rp.running?`Replaying ${rp.done}/${rp.total||'…'}`:'Replay history';
+  $('#lReplayTxt').innerHTML=rp.running?`<span class="spin"></span> ${esc(rp.note||'Collecting coins…')} · ${rp.added} snapshots so far (${rp.wins} wins)`
+    :rp.finished?`Last replay: ${rp.added} snapshots, ${rp.wins} wins, from ${rp.done} coins ${ago(rp.finished)}.${rp.error?' <span class="down">'+esc(rp.error)+'</span>':''}`
+    :(L.replayed?`${L.replayed} of the labeled snapshots come from replay.`:'Replay walks recent coins\' past candles to label hundreds of setups in minutes. Price and volume only; it never counts toward unlocking real trading.');
+  $('#lReplay').onclick=async()=>{try{await api('/api/hunter/replay',{method:'POST'});toast('Replay started');loadLearn()}catch(e){toast(e.message,true)}};
+  clearTimeout(window._rpT);if(rp.running)window._rpT=setTimeout(()=>{if(document.querySelector('#v-learn:not([hidden])')||document.querySelector('#v-learn.on'))loadLearn()},4000);
   $('#lProgTxt').textContent=m.ready?`Model trained on ${m.n} outcomes (${m.pos} wins).`:`${L.labeled} / ${need} labeled outcomes. ${m.why||''}`;
   const w=(m.weights||[]).slice(0,10),mx=Math.max(...w.map(x=>Math.abs(x[1])),1e-9);
   $('#lWeights').innerHTML=w.length?'<div class="sub" style="margin-bottom:6px">What the model learned (green raises win odds, red lowers them)</div>'+w.map(([k,v])=>`<div class="br"><span>${esc(k)}</span><span class="t"><i style="width:${Math.abs(v)/mx*100}%;background:${v>0?'var(--glow)':'var(--coral)'}"></i></span><span style="text-align:right">${v>0?'+':''}${v.toFixed(2)}</span></div>`).join(''):'';
   const all=[...(h.pending||[]),...h.recent];
   $('#lRecent').innerHTML=`<thead><tr><th>Token</th><th class="num">Score</th><th>Result</th><th class="num">Max up</th><th class="num">Max down</th><th class="num">End</th><th>When</th></tr></thead><tbody>`+
-   (all.length?all.map(r=>`<tr class="click snapr" data-addr="${esc(r.address)}" title="Open the chart with Base Hunter flags on"><td><b>${esc(r.symbol)}</b></td><td class="num">${r.rule??'—'}</td><td>${r.win==null?'<span class="tag">WAITING</span>':`<span class="tag ${r.win?'good':'bad'}">${r.win?'WIN':'LOSS'}</span>`}</td>`+
+   (all.length?all.map(r=>`<tr class="click snapr" data-addr="${esc(r.address)}" title="Open the chart with Base Hunter flags on"><td><b>${esc(r.symbol)}</b>${r.replay?' <span class="tag" title="From historical replay">replay</span>':''}</td><td class="num">${r.rule??'—'}</td><td>${r.win==null?'<span class="tag">WAITING</span>':`<span class="tag ${r.win?'good':'bad'}">${r.win?'WIN':'LOSS'}</span>`}</td>`+
      (r.win==null?`<td class="num sub">—</td><td class="num sub">—</td><td class="num sub">${fdur(Math.max(0,lab.horizon_min-(Date.now()/1000-r.ts)/60))} left</td>`
       :`<td class="num up">${spct(r.max_up,0)}</td><td class="num down">−${pct(r.max_dd)}</td><td class="num ${r.end_ret>=0?'up':'down'}">${spct(r.end_ret,0)}</td>`)+`<td class="sub">${ago(r.ts)}</td></tr>`).join('')
     :`<tr><td colspan="7"><div class="empty">Outcomes appear ${lab.horizon_min} minutes after each Base Hunter snapshot. Keep kraken running with auto-scan on.</div></td></tr>`)+'</tbody>';
@@ -244,6 +271,11 @@ const SPEC={
   ['max_dev_launches','Skip dev with ≥ launches (0 = off)','int','Serial launchers who spam hundreds of coins.',10],['max_logo_dups','Skip logo reused ≥ times (0 = off)','int','Copycat coins with a recycled image.',1],
   ['min_buys_1h','Min buys in last hour','int','Fewer = dead, nobody is buying.',1],['skip_wash','Skip wash-traded coins','bool','GMGN flagged fake volume.'],
   ['label_tp','Win = up','pct','Learning label: a win if price rises this much…',5],['label_sl','…before down','pct','…before falling this much…',5],['label_horizon_min','…within (min)','int','',10]]],
+ autotrade:['Auto-trade',[
+  ['enabled','Auto paper-trade Base Hunter finds','bool','Buys every find at or above the min score, paper unless live is unlocked and on.'],['min_score','Min score to buy','int','',1],
+  ['size','Size per trade','num','In SOL / BNB / ETH.',0.01],['tp','Take profit','pct','',5],['sl','Stop loss','pct','',5],['max_hold_min','Sell after (min)','int','Time limit if neither hits.',10],
+  ['max_open','Max open auto trades','int','',1],['daily_loss_limit','Daily loss limit','num','Auto-trading pauses for 24h after losing this much.',0.05],['cooldown_h','Don\'t re-buy a coin for (h)','int','',1],
+  ['unlock_trades','Unlock live after paper trades','int','',10],['unlock_profit_factor','…and profit factor ≥','num','Gross wins ÷ gross losses.',0.1]]],
  screen:['Screener',[
   ['interval','Trending window','select:1m|5m|1h|6h|24h',''],['limit','Tokens per run','int','',10],
   ['auto','Auto-screen','bool',''],['auto_every_min','Every (min)','int','',1],

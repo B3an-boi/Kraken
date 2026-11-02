@@ -30,6 +30,11 @@ DEFAULTS: dict = {
         "max_dev_launches": 100, "max_logo_dups": 5, "skip_wash": True, "min_buys_1h": 5,
         "label_tp": 0.30, "label_sl": 0.15, "label_horizon_min": 120,
     },
+    "autotrade": {
+        "enabled": False, "live": False, "min_score": 40, "size": 0.05, "tp": 0.30, "sl": 0.15,
+        "max_hold_min": 120, "max_open": 5, "daily_loss_limit": 0.25, "cooldown_h": 6,
+        "unlock_trades": 100, "unlock_profit_factor": 1.3,
+    },
     "risk": {
         "buy_size": 0.05, "max_positions": 10, "max_exposure": 1.0, "daily_loss_limit": 0.5,
         "slippage": 0.15, "stop_loss": 0.25, "take_profit": 1.0, "monitor_every_s": 30,
@@ -49,6 +54,10 @@ BOUNDS: dict = {
     "hunter.max_vol_ratio": (0.01, 10.0), "hunter.near_low": (1.0, 5.0), "hunter.max_mc_vs_ath": (0.01, 1.0),
     "hunter.max_dev_launches": (0, 100000), "hunter.max_logo_dups": (0, 10000), "hunter.min_buys_1h": (0, 10000),
     "hunter.label_tp": (0.01, 10.0), "hunter.label_sl": (0.01, 0.99), "hunter.label_horizon_min": (10, 1440),
+    "autotrade.min_score": (0, 100), "autotrade.size": (0.0001, 1000.0), "autotrade.tp": (0.01, 10.0),
+    "autotrade.sl": (0.01, 0.99), "autotrade.max_hold_min": (5, 1440), "autotrade.max_open": (1, 50),
+    "autotrade.daily_loss_limit": (0.0001, 1000.0), "autotrade.cooldown_h": (0, 168),
+    "autotrade.unlock_trades": (30, 10000), "autotrade.unlock_profit_factor": (1.0, 10.0),
     "risk.buy_size": (0.0001, 1000.0), "risk.max_positions": (1, 100), "risk.slippage": (0.001, 0.5),
     "risk.stop_loss": (0.01, 0.99), "risk.take_profit": (0.01, 100.0), "risk.monitor_every_s": (5, 3600),
     "rate.min_gap_s": (0.05, 10.0), "rate.max_inflight": (1, 8),
