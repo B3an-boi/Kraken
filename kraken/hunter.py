@@ -58,6 +58,7 @@ class Hunter:
                     seen.add(r["address"])
                     rows.append(r)
         stats = dict(pool=len(rows), safe=0, prefilter=0, charted=0, found=0, setup=c["setup"], why={})
+        why = Counter()
         pre = []
         for r in rows:
             t = Token.from_row(r)
@@ -69,6 +70,10 @@ class Hunter:
                     or (c["max_mcap"] and t.mcap > c["max_mcap"]) or t.liquidity < c["min_liq"]):
                 continue
             if floor and t.ath_mcap > 0 and t.mcap / t.ath_mcap > c["max_mc_vs_ath"]:
+                continue
+            slop = self._slop(r, c)
+            if slop:
+                why[slop] += 1
                 continue
             stats["prefilter"] += 1
             pre.append((t, r, self.flow.summary(t.address)))
@@ -86,7 +91,6 @@ class Hunter:
 
         with ThreadPoolExecutor(max_workers=4) as ex:
             charts = list(ex.map(fetch, pre))
-        why = Counter()
         a = self.model.blend_weight()
         out = []
         for (t, r, _), cs in charts:
@@ -109,6 +113,11 @@ class Hunter:
             if not b:
                 why[reason] += 1
                 continue
+            # a base passed: one token-info call to catch slop the trending row doesn't show
+            slop = self._slop_info(client, t.address, c)
+            if slop:
+                why[slop] += 1
+                continue
             stats["found"] += 1
             k = chart_read(cs)
             flow = self.flow.summary(t.address, b["start_ts"])
@@ -126,6 +135,41 @@ class Hunter:
         out.sort(key=lambda o: -o["score"])
         stats["why"] = dict(why.most_common())
         return dict(results=out, stats=stats)
+
+    # ── slop filter: serial launchers, copycat logos, wash trading, dead coins ──
+    @staticmethod
+    def _slop(r: dict, c: dict) -> str | None:
+        f = lambda k: float(r.get(k) or 0) if str(r.get(k) or "0").replace(".", "", 1).isdigit() else 0.0
+        if c.get("skip_wash", True) and str(r.get("is_wash_trading")).lower() in ("true", "1"):
+            return "wash trading"
+        dev = f("creator_created_count")
+        if c.get("max_dev_launches") and dev >= c["max_dev_launches"]:
+            return "serial-launcher dev"
+        dup = f("image_dup") or f("image_dup_count")
+        if c.get("max_logo_dups") and dup >= c["max_logo_dups"]:
+            return "copycat logo"
+        return None
+
+    def _slop_info(self, client, address: str, c: dict) -> str | None:
+        try:
+            info = client.token_info(address) or {}
+        except Exception:
+            return None
+        stat, price = info.get("stat") or {}, info.get("price") if isinstance(info.get("price"), dict) else {}
+        num = lambda v: float(v) if v not in (None, "") else 0.0
+        try:
+            dev = num(stat.get("creator_created_count"))
+            dup = num(info.get("image_dup_count"))
+            buys = num(price.get("buys_1h"))
+        except (TypeError, ValueError):
+            return None
+        if c.get("max_dev_launches") and dev >= c["max_dev_launches"]:
+            return "serial-launcher dev"
+        if c.get("max_logo_dups") and dup >= c["max_logo_dups"]:
+            return "copycat logo"
+        if c.get("min_buys_1h") and price and buys < c["min_buys_1h"]:
+            return "no buyers in 1h"
+        return None
 
     # ── learning loop ─────────────────────────────────────────────────────
     def poll_flow(self, client, tape=None, chain="sol"):
@@ -147,7 +191,8 @@ class Hunter:
                 cs = client.kline_range(s["address"], s["ts"], s["ts"] + bh.LABEL["horizon_min"] * 60 + 60)
             except Exception:
                 continue
-            out = bh.label_outcome(s["price"], cs)
+            # after the window plus 15 min of slack for GMGN's data, label even if trading was sparse
+            out = bh.label_outcome(s["price"], cs, sparse_ok=time.time() - s["ts"] > (bh.LABEL["horizon_min"] + 15) * 60)
             if out:
                 self.store.add_label(s["id"], out)
                 n += 1
@@ -157,13 +202,20 @@ class Hunter:
 
     def public_state(self) -> dict:
         labeled = self.store.labeled()
-        recent = [dict(symbol=s["symbol"], address=s["address"], ts=s["ts"], rule=s.get("rule"), p=s.get("p"),
+        recent = [dict(id=s["id"], chain=s.get("chain", "sol"), price=s.get("price"), symbol=s["symbol"], address=s["address"],
+                       ts=s["ts"], rule=s.get("rule"), p=s.get("p"),
                        win=l["win"], max_up=l.get("max_up"), max_dd=l.get("max_dd"), end_ret=l.get("end_ret"))
                   for s, l in labeled[-25:]][::-1]
+        # snapshots still inside their 2h window, shown as "waiting" so you can watch them play out
+        with self.store.lock:
+            waiting = sorted((s for i, s in self.store.samples.items() if i not in self.store.labels
+                              and time.time() - s["ts"] < 24 * 3600), key=lambda s: -s["ts"])[:60]
+        pending = [dict(id=s["id"], chain=s.get("chain", "sol"), price=s.get("price"), symbol=s["symbol"],
+                        address=s["address"], ts=s["ts"], rule=s.get("rule"), p=s.get("p"), win=None) for s in waiting]
         info = (self.model.state or {}).get("info") or dict(ready=False, why="no labeled data yet")
         return dict(results=self.state["results"], stats=self.state["stats"], last_scan=self.state["last_scan"],
                     scanning=self.state["scanning"], error=self.state["error"], learn=self.store.stats(),
                     model=info, blend=self.model.blend_weight(), label=dict(bh.LABEL),
                     min_labeled=bh.Model.MIN_N,
                     flow=dict(coverage_min=round(self.flow.coverage_min()), tokens=len(self.flow.trades)),
-                    recent=recent)
+                    recent=recent, pending=pending)

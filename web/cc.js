@@ -248,7 +248,7 @@ const reportHTML=t=>`<div class="report">${esc(t||'')}</div>`;
 
 /* ── trading chart (TradingView Lightweight Charts, Apache-2.0) ── */
 const TV={
-  open(addr,res){this.addr=addr;$('#tvTf').onclick=e=>{const b=e.target.closest('[data-res]');if(!b)return;document.querySelectorAll('#tvTf button').forEach(x=>x.classList.toggle('on',x===b));this.load(b.dataset.res)};this.load(res)},
+  open(addr,res){if(this.flagsFor!==addr){this.flags=null;this.flagsFor=addr;this.autoRes=!!this.wantFlags;this.showFlags=!!this.wantFlags||(()=>{try{return localStorage.getItem('kraken.flags')==='1'}catch(e){return false}})();this.wantFlags=false}this.addr=addr;$('#tvTf').onclick=e=>{const b=e.target.closest('[data-res]');if(!b)return;document.querySelectorAll('#tvTf button').forEach(x=>x.classList.toggle('on',x===b));this.load(b.dataset.res)};this.load(res)},
   async load(res){
     const box=$('#tvBox'),msg=$('#tvMsg');if(!box)return;
     if(typeof LightweightCharts==='undefined'){msg.textContent='The chart library needs an internet connection.';return}
@@ -265,8 +265,9 @@ const TV={
       rightPriceScale:{borderColor:'#26262a',scaleMargins:{top:.08,bottom:.06}},
       timeScale:{borderColor:'#26262a',timeVisible:true,secondsVisible:false,rightOffset:6,barSpacing:7},
       crosshair:{mode:LightweightCharts.CrosshairMode.Normal,vertLine:{color:'#9b9ba255',labelBackgroundColor:'#242427'},horzLine:{color:'#9b9ba255',labelBackgroundColor:'#242427'}},
-      localization:{priceFormatter:fmtPx}});
-    this.chart=chart;
+      localization:{priceFormatter:fmtPx,timeFormatter:t=>new Date(t*1000).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}});
+    chart.applyOptions({timeScale:{tickMarkFormatter:(t,type)=>{const d=new Date(t*1000);return type<=2?d.toLocaleDateString([], type===0?{year:'numeric'}:type===1?{month:'short'}:{month:'short',day:'numeric'}):d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}}});
+    this.chart=chart;this.flagS=null;
     const bars=raw.map(([t,o,h,l,c])=>({time:t,open:o,high:h,low:l,close:c}));
     const cs=chart.addCandlestickSeries({upColor:'#8b8cff',downColor:'#ff6a4d',borderUpColor:'#8b8cff',borderDownColor:'#ff6a4d',wickUpColor:'#8b8cff',wickDownColor:'#ff6a4d',priceFormat:{type:'custom',formatter:fmtPx,minMove:1e-12}});
     cs.setData(bars);this.cs=cs;this.bars=bars;this.res=res;
@@ -286,8 +287,9 @@ const TV={
     show(last,bars.length-1);
     const idx=new Map(bars.map((b,i)=>[b.time,i]));
     chart.subscribeCrosshairMove(p=>{const b=p&&p.time!=null?bars[idx.get(p.time)]:null;show(b||last,b?idx.get(p.time):bars.length-1)});
-    this.avgLine=null;this.ordLines=[];this.pvLine=null;
+    this.avgLine=null;this.ordLines=[];this.pvLine=null;this.flagLines=[];this._bubSub=null;
     this.trade();this.syncPos();
+    this.flagUI();
     chart.subscribeClick(p=>{if(this.tab!=='lmt'||!p||!p.point)return;const px=cs.coordinateToPrice(p.point.y);if(px>0){$('#tqPx').value=+px.toPrecision(5);this.preview()}});
     clearInterval(this.timer);this.timer=setInterval(()=>{if(CC.token===this.addr&&document.body.contains($('#tvBox')))this.syncPos();else clearInterval(this.timer)},8000);
   },
@@ -357,6 +359,11 @@ const TV={
       const grp=new Map();for(const f of fills){if(f.ts<first-step)continue;const tt=Math.min(lastT,first+Math.floor((f.ts-first)/step)*step),k=tt+f.side;const g=grp.get(k)||{time:tt,side:f.side,n:0,size:0};g.n++;g.size+=f.size||0;grp.set(k,g)}
       const marks=[...grp.values()].map(g=>{const buy=g.side==='buy';return {time:g.time,position:buy?'belowBar':'aboveBar',color:buy?'#8b8cff':'#ff6a4d',shape:buy?'arrowUp':'arrowDown',
         text:`${buy?'B':'S'} ${+g.size.toFixed(3)}${g.n>1?' ×'+g.n:''}`}}).sort((a,b)=>a.time-b.time);
+      // Base Hunter flags: a yellow dot at the exact price and candle where it flagged
+      const fd=new Map();for(const f of (this.showFlags?this.flags||[]:[])){if(f.ts<first-step||f.ts>lastT+step||!f.price)continue;fd.set(Math.min(lastT,first+Math.floor((f.ts-first)/step)*step),f.price)}
+      if(!this.flagS)this.flagS=this.chart.addLineSeries({color:'#ffcc4d',lineVisible:false,pointMarkersVisible:true,pointMarkersRadius:4,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,priceFormat:{type:'custom',formatter:fmtPx,minMove:1e-12}});
+      this.flagS.setData([...fd].sort((a,b)=>a[0]-b[0]).map(([time,value])=>({time,value})));
+      marks.sort((a,b)=>a.time-b.time);
       this.cs.setMarkers(marks);
       if(p){const up=p.pnl_pct>=0;this.avgLine=this.cs.createPriceLine({price:p.entry_price,color:up?'#8b8cff':'#ff6a4d',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,
         title:`AVG ${spct(p.pnl_pct,1)} · ${p.pnl>=0?'+':''}${p.pnl.toFixed(4)} ${nat}`})}
@@ -366,6 +373,28 @@ const TV={
       <div class="kv2"><span>Now</span><b>${fmtPx(p.last_price)}</b></div><div class="kv2"><span>Unrealized</span><b class="${p.pnl>=0?'up':'down'}">${p.pnl>=0?'+':''}${p.pnl.toFixed(4)} (${spct(p.pnl_pct,1)})</b></div>
       ${p.realized?`<div class="kv2"><span>Realized</span><b class="${p.realized>=0?'up':'down'}">${p.realized>=0?'+':''}${p.realized.toFixed(4)}</b></div>`:''}<div class="sub" style="margin-top:4px">${(p.fills||[]).filter(f=>f.side==='buy').length} buys · ${p.mode==='LIVE'?'live':'paper'}</div>`
       :closed&&Date.now()/1000-(closed.exit_ts||0)<3600?`<div class="sub">Closed ${ago(closed.exit_ts)} · <b class="${closed.pnl>=0?'up':'down'}">${closed.pnl>=0?'+':''}${closed.pnl.toFixed(4)} ${nat}</b></div>`:'<div class="sub">No position yet. Buy to start; each buy updates your average entry.</div>';
+  },
+  /* Base Hunter flags: optional overlay with a bubble at the latest flag plus its target and stop */
+  async flagUI(clicked){
+    const btn=$('#tvFlag');if(!btn)return;
+    btn.onclick=async()=>{this.showFlags=!this.showFlags;try{localStorage.setItem('kraken.flags',this.showFlags?'1':'0')}catch(e){}await this.flagUI(true)};
+    btn.classList.toggle('on',!!this.showFlags);btn.setAttribute('aria-pressed',String(!!this.showFlags));
+    if(this.showFlags&&this.flags==null){btn.classList.add('busy');try{const d=await api('/api/hunter/flags/'+encodeURIComponent(this.addr));this.flags=d.flags||[];this.rule={tp:d.tp,sl:d.sl,h:d.horizon_min*60}}catch(e){this.flags=[]}btn.classList.remove('busy')}
+    const n=(this.flags||[]).length;btn.textContent=this.showFlags&&this.flags?`⚑ Hunter flags · ${n}`:'⚑ Hunter flags';
+    this.drawFlags(clicked);this.syncPos();
+    if(clicked&&this.showFlags&&this.flags&&!n)toast('Base Hunter has never flagged this token');
+  },
+  drawFlags(loud){
+    const box=$('#tvBox');if(!box||!this.cs||!this.bars)return;
+    (this.flagLines||[]).forEach(l=>{try{this.cs.removePriceLine(l)}catch(e){}});this.flagLines=[];
+    let bub=$('#tvBub');if(!bub){box.insertAdjacentHTML('beforeend','<div class="snapbub" id="tvBub" hidden></div>');bub=$('#tvBub')}
+    if(this._bubSub){this.chart.timeScale().unsubscribeVisibleLogicalRangeChange(this._bubSub);this._bubSub=null}
+    const fl=this.showFlags?this.flags||[]:[];if(!fl.length){bub.hidden=true;return}
+    const first=this.bars[0].time,last=this.bars[this.bars.length-1].time,step=this.bars.length>1?this.bars[1].time-this.bars[0].time:60;
+    const inView=fl.filter(f=>f.ts>=first-step&&f.ts<=last+step),f=inView[inView.length-1];
+    if(!f&&this.autoRes){this.autoRes=false;const age=(Date.now()/1000-fl[fl.length-1].ts)/3600,r=age<5.5?'1m':age<46?'5m':age<115?'15m':age<470?'1h':'4h';const b=document.querySelector(`#tvTf [data-res="${r}"]`);if(b&&!b.classList.contains('on')){b.click();return}}
+    if(f)this.autoRes=false;
+    if(!f){bub.hidden=true;if(loud)toast(`Flagged ${ago(fl[fl.length-1].ts)}, earlier than this timeframe shows. Try a longer one.`);return}
   },
   async syncOrders(){
     let o;try{o=await api('/api/orders')}catch(e){return}
@@ -407,7 +436,7 @@ async function openToken(addr){
     <div class="row" style="gap:6px;margin-top:6px">${t.launchpad?`<span class="tag">${esc(t.launchpad)}</span>`:''}<span class="tag ${t.bonded?'good':'warn'}">${t.bonded?'bonded':'on bonding curve '+pct(t.progress)}</span>${t.created?`<span class="tag">age ${fdur((Date.now()/1000-t.created)/60)}</span>`:''}${Object.entries(t.links||{}).map(([k,v])=>`<a class="tag" href="${esc(k==='twitter_username'&&!/^https?:/.test(v)?'https://x.com/'+v:v)}" target="_blank" rel="noopener noreferrer">${k==='twitter_username'?'X':esc(k)} ↗</a>`).join('')}<a class="tag" href="https://gmgn.ai/${esc(chainNow())}/token/${encodeURIComponent(addr)}" target="_blank" rel="noopener noreferrer">GMGN ↗</a><a class="tag" href="${scanUrl('token',addr)}" target="_blank" rel="noopener noreferrer">${scanName()} ↗</a></div></div></div>
   <div class="tiles">${[['Price',t.price?'$'+Number(t.price).toPrecision(4):'—'],['Market cap',money(t.mcap)],['Liquidity',money(t.liquidity)],['Holders',(t.holders||0).toLocaleString()],['5m / 1h',chg('5m')+' · '+chg('1h')],['Vol 1h',money(t.vol['1h']),`${t.buys_1h} buys · ${t.sells_1h} sells`]].map(([k,v,s])=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`).join('')}</div>
   <div class="card tv" style="margin-bottom:14px">
-    <div class="tvbar"><div class="tvleg" id="tvLeg"></div><div class="tvtf" id="tvTf">${['1m','5m','15m','1h','4h'].map(r=>`<button data-res="${r}" class="${r===(d.chart.bar_min===1?'1m':'15m')?'on':''}">${r}</button>`).join('')}</div></div>
+    <div class="tvbar"><div class="tvleg" id="tvLeg"></div><div class="row" style="gap:8px"><button class="tvflag" id="tvFlag" aria-pressed="false" title="Show where Base Hunter flagged this token">⚑ Hunter flags</button><div class="tvtf" id="tvTf">${['1m','5m','15m','1h','4h'].map(r=>`<button data-res="${r}" class="${r===(d.chart.bar_min===1?'1m':'15m')?'on':''}">${r}</button>`).join('')}</div></div></div>
     <div class="tvbox" id="tvBox"><div class="tvmsg" id="tvMsg"><span class="spin"></span> Loading chart…</div></div>
     ${d.chart.pattern?`<div class="row" style="margin-top:10px;gap:6px"><span class="tag">${esc(d.chart.pattern.pattern)}</span><span class="tag">chart score ${d.chart.pattern.score}</span><span class="sub">${d.chart.pattern.why.map(esc).join(' · ')}</span></div>`:''}
   </div>
@@ -656,3 +685,4 @@ try{const v=localStorage.getItem('kraken.view');if(v&&$('#v-'+v)&&!['token','wal
 if(!route())show(ST.view);runBT();
 api('/api/setup').then(s=>{if(!s.ready&&!wizSkipped)openWizard(false)}).catch(()=>{});
 setInterval(()=>{if(!document.hidden&&!['settings','token','wallet'].includes(ST.view))refresh()},8000);
+

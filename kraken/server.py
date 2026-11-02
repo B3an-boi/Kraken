@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__, backtest, graph, research, screener, setup_flow
+from . import basehunter as bh
 from .alerts import Alerts
 from .config import DATA, ROOT, Settings
 from .gmgn import NATIVE, DemoClient, GMGNError, LiveClient, RateGate, key_status
@@ -180,6 +181,42 @@ def _run_hunter():
 @app.get("/api/hunter")
 def get_hunter():
     return HUNTER.public_state()
+
+
+_SNAP_CACHE: dict = {}
+
+
+@app.get("/api/hunter/snap/{sid:path}")
+def hunter_snap(sid: str):
+    """1m candles around one Base Hunter snapshot: 45 min before the flag to 15 min after its 2h check."""
+    s = HUNTER.store.samples.get(sid)
+    if not s:
+        raise HTTPException(404, "snapshot not found")
+    lab = HUNTER.store.labels.get(sid)
+    if lab and sid in _SNAP_CACHE:
+        return _SNAP_CACHE[sid]
+    h = bh.LABEL["horizon_min"] * 60
+    try:
+        cs = client(s.get("chain", "sol")).kline_range(s["address"], s["ts"] - 45 * 60, s["ts"] + h + 15 * 60)
+    except Exception as e:
+        _err(e)
+    out = dict(id=sid, symbol=s["symbol"], address=s["address"], chain=s.get("chain", "sol"), ts=s["ts"], price=s.get("price"),
+               rule=s.get("rule"), p=s.get("p"), label=lab, tp=bh.LABEL["tp"], sl=bh.LABEL["sl"], horizon_min=bh.LABEL["horizon_min"],
+               candles=[[x["t"], x["o"], x["h"], x["l"], x["c"], x["v"]] for x in cs])
+    if lab:
+        _SNAP_CACHE[sid] = out
+        if len(_SNAP_CACHE) > 200:
+            _SNAP_CACHE.pop(next(iter(_SNAP_CACHE)))
+    return out
+
+
+@app.get("/api/hunter/flags/{address}")
+def hunter_flags(address: str):
+    """Every time Base Hunter flagged this token, for markers on the token chart."""
+    with HUNTER.store.lock:
+        rows = [dict(ts=s["ts"], price=s.get("price"), rule=s.get("rule"),
+                     win=(HUNTER.store.labels.get(i) or {}).get("win")) for i, s in HUNTER.store.samples.items() if s["address"] == address]
+    return dict(flags=sorted(rows, key=lambda r: r["ts"]), tp=bh.LABEL["tp"], sl=bh.LABEL["sl"], horizon_min=bh.LABEL["horizon_min"])
 
 
 @app.post("/api/hunter/scan")

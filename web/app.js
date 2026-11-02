@@ -201,9 +201,13 @@ async function loadLearn(){
   $('#lProgTxt').textContent=m.ready?`Model trained on ${m.n} outcomes (${m.pos} wins).`:`${L.labeled} / ${need} labeled outcomes. ${m.why||''}`;
   const w=(m.weights||[]).slice(0,10),mx=Math.max(...w.map(x=>Math.abs(x[1])),1e-9);
   $('#lWeights').innerHTML=w.length?'<div class="sub" style="margin-bottom:6px">What the model learned (green raises win odds, red lowers them)</div>'+w.map(([k,v])=>`<div class="br"><span>${esc(k)}</span><span class="t"><i style="width:${Math.abs(v)/mx*100}%;background:${v>0?'var(--glow)':'var(--coral)'}"></i></span><span style="text-align:right">${v>0?'+':''}${v.toFixed(2)}</span></div>`).join(''):'';
+  const all=[...(h.pending||[]),...h.recent];
   $('#lRecent').innerHTML=`<thead><tr><th>Token</th><th class="num">Score</th><th>Result</th><th class="num">Max up</th><th class="num">Max down</th><th class="num">End</th><th>When</th></tr></thead><tbody>`+
-   (h.recent.length?h.recent.map(r=>`<tr><td>${tokLink(r.address,r.symbol)}</td><td class="num">${r.rule??'—'}</td><td><span class="tag ${r.win?'good':'bad'}">${r.win?'WIN':'LOSS'}</span></td><td class="num up">${spct(r.max_up,0)}</td><td class="num down">−${pct(r.max_dd)}</td><td class="num ${r.end_ret>=0?'up':'down'}">${spct(r.end_ret,0)}</td><td class="sub">${ago(r.ts)}</td></tr>`).join('')
+   (all.length?all.map(r=>`<tr class="click snapr" data-addr="${esc(r.address)}" title="Open the chart with Base Hunter flags on"><td><b>${esc(r.symbol)}</b></td><td class="num">${r.rule??'—'}</td><td>${r.win==null?'<span class="tag">WAITING</span>':`<span class="tag ${r.win?'good':'bad'}">${r.win?'WIN':'LOSS'}</span>`}</td>`+
+     (r.win==null?`<td class="num sub">—</td><td class="num sub">—</td><td class="num sub">${fdur(Math.max(0,lab.horizon_min-(Date.now()/1000-r.ts)/60))} left</td>`
+      :`<td class="num up">${spct(r.max_up,0)}</td><td class="num down">−${pct(r.max_dd)}</td><td class="num ${r.end_ret>=0?'up':'down'}">${spct(r.end_ret,0)}</td>`)+`<td class="sub">${ago(r.ts)}</td></tr>`).join('')
     :`<tr><td colspan="7"><div class="empty">Outcomes appear ${lab.horizon_min} minutes after each Base Hunter snapshot. Keep kraken running with auto-scan on.</div></td></tr>`)+'</tbody>';
+  $('#lRecent').onclick=e=>{const tr=e.target.closest('tr.snapr');if(!tr)return;TV.wantFlags=true;TV.flagsFor=null;goToken(tr.dataset.addr)};
 }
 async function runBT(){
   const q=new URLSearchParams();
@@ -237,6 +241,8 @@ const SPEC={
   ['min_mcap','Min market cap $','num','',1000],['max_mcap','Max market cap $ (0 = any)','num','',10000],
   ['max_age_h','Max age h (0 = any)','num','',1],['min_age_min','Min age (min)','num','',5],['min_liq','Min liquidity $','num','',1000],
   ['max_chg_1h','Max 1h move','pct','Skip coins already moving.',5],['max_chg_5m','Max 5m move','pct','',1],
+  ['max_dev_launches','Skip dev with ≥ launches (0 = off)','int','Serial launchers who spam hundreds of coins.',10],['max_logo_dups','Skip logo reused ≥ times (0 = off)','int','Copycat coins with a recycled image.',1],
+  ['min_buys_1h','Min buys in last hour','int','Fewer = dead, nobody is buying.',1],['skip_wash','Skip wash-traded coins','bool','GMGN flagged fake volume.'],
   ['label_tp','Win = up','pct','Learning label: a win if price rises this much…',5],['label_sl','…before down','pct','…before falling this much…',5],['label_horizon_min','…within (min)','int','',10]]],
  screen:['Screener',[
   ['interval','Trending window','select:1m|5m|1h|6h|24h',''],['limit','Tokens per run','int','',10],

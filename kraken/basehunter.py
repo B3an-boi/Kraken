@@ -195,13 +195,19 @@ class FlowTracker:
 
 
 # ── outcome labeling ───────────────────────────────────────────────────────
-def label_outcome(entry_price: float, candles_after: list, tp=None, sl=None) -> dict | None:
+def label_outcome(entry_price: float, candles_after: list, tp=None, sl=None, sparse_ok=False) -> dict | None:
     """Walk 1m candles after the snapshot: win if +tp is touched before -sl. Same-candle touches of
     both count as a loss (conservative). None if there are too few candles to judge."""
     tp = LABEL["tp"] if tp is None else tp
     sl = LABEL["sl"] if sl is None else sl
-    if not entry_price or len(candles_after) < LABEL["horizon_min"] * 0.5:
+    # GMGN leaves out minutes with no trades, so a quiet coin can have far fewer than 120 candles.
+    # Once the window is well over, judge it on the candles that exist; none at all means nobody traded = loss.
+    if not entry_price:
         return None
+    if len(candles_after) < LABEL["horizon_min"] * 0.5 and not sparse_ok:
+        return None
+    if not candles_after:
+        return dict(win=0, max_up=0.0, max_dd=0.0, end_ret=0.0, resolved=False, dead=True)
     up_px, dn_px = entry_price * (1 + tp), entry_price * (1 - sl)
     max_up = max_dd = 0.0
     result = None

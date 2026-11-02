@@ -27,6 +27,7 @@ DEFAULTS: dict = {
         "min_pump": 2.5, "min_retrace": 0.60, "max_vol_ratio": 0.25, "near_low": 1.15,
         "max_mc_vs_ath": 0.40, "max_chg_1h": 0.25, "max_chg_5m": 0.06,
         "min_usd_per_min_floor": 15, "min_usd_per_min_any": 100,
+        "max_dev_launches": 100, "max_logo_dups": 5, "skip_wash": True, "min_buys_1h": 5,
         "label_tp": 0.30, "label_sl": 0.15, "label_horizon_min": 120,
     },
     "risk": {
@@ -46,6 +47,7 @@ BOUNDS: dict = {
     "hunter.scan_n": (1, 100), "hunter.auto_every_min": (2, 1440), "hunter.min_base_min": (5, 2880),
     "hunter.max_range": (0.01, 2.0), "hunter.min_pump": (1.0, 1000.0), "hunter.min_retrace": (0.0, 0.999),
     "hunter.max_vol_ratio": (0.01, 10.0), "hunter.near_low": (1.0, 5.0), "hunter.max_mc_vs_ath": (0.01, 1.0),
+    "hunter.max_dev_launches": (0, 100000), "hunter.max_logo_dups": (0, 10000), "hunter.min_buys_1h": (0, 10000),
     "hunter.label_tp": (0.01, 10.0), "hunter.label_sl": (0.01, 0.99), "hunter.label_horizon_min": (10, 1440),
     "risk.buy_size": (0.0001, 1000.0), "risk.max_positions": (1, 100), "risk.slippage": (0.001, 0.5),
     "risk.stop_loss": (0.01, 0.99), "risk.take_profit": (0.01, 100.0), "risk.monitor_every_s": (5, 3600),

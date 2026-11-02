@@ -157,6 +157,17 @@ def _f(v, d=0.0):
         return d
 
 
+def _usd_vol(c: dict, price: float) -> float:
+    """Dollar volume of one candle. GMGN has a 'volume' and an 'amount' field and which one is USD is not
+    consistent, so take the one that matches the other one × price (tokens × price = dollars)."""
+    a, v = c.get("amount"), c.get("volume")
+    a = _f(a) if a not in (None, "") else None
+    v = _f(v) if v not in (None, "") else None
+    if a and v and price > 0:
+        return v if abs(math.log(a * price / v)) <= abs(math.log(v * price / a)) else a
+    return (v if v is not None else a) or 0.0
+
+
 def parse_candles(raw) -> list[dict]:
     out = []
     for c in raw or []:
@@ -166,8 +177,7 @@ def parse_candles(raw) -> list[dict]:
             continue
         if min(h, l, cl) <= 0:
             continue
-        out.append(dict(t=t if t < 1e11 else t // 1000, o=o, h=h, l=l, c=cl,
-                        v=_f(c.get("amount") if c.get("amount") is not None else c.get("volume"))))
+        out.append(dict(t=t if t < 1e11 else t // 1000, o=o, h=h, l=l, c=cl, v=_usd_vol(c, cl)))
     out.sort(key=lambda x: x["t"])
     return out
 
