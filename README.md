@@ -16,18 +16,6 @@ Runs on your own computer · uses your own GMGN API key · keys never leave your
 
 ---
 
-## Screenshots
-
-**Discover:** live KPIs, the smart-money network, the screener, money flow, live trades and call-outs on one screen.
-
-<img src="docs/screenshots/discover.png" alt="kraken Discover dashboard: KPI cards, smart-money network graph, screener and live trades" width="100%">
-
-**Token page:** TradingView-style chart with a paper or live trade box. Buy, sell 25/50/100% or set limit orders right on the chart; buys and sells are marked on the candles and your P/L is tracked as you go.
-
-<img src="docs/screenshots/token-chart.png" alt="kraken token chart with the quick-trade box and buy and sell markers" width="100%">
-
----
-
 ## What you need
 
 - A **Windows, Mac or Linux** computer
@@ -121,6 +109,27 @@ cd Kraken
 Every wallet, token and transaction links to **Solscan** (BscScan, BaseScan or Etherscan on the other chains) and GMGN.
 
 More detail: **[How it works](docs/how-it-works.md)** · **[Settings reference](docs/settings.md)** · **[Alerts setup](docs/alerts.md)**
+
+### Screenshots
+
+**Discover (home screen)**
+
+<img src="docs/screenshots/dashboard.png" alt="kraken Discover dashboard: KPI cards, smart-money network graph, screener and live trades" width="100%">
+
+- **Top row:** tokens tracked, how many pass the quick safety check, smart money's net buying in the last hour, and your open positions.
+- **Smart money network** (left): smart-money and KOL wallets (purple) linked to the tokens they traded (coral) in the last 60 minutes. Solid lines are buys, dashed lines are sells. Hover to focus on one token or wallet, click to research it.
+- **Screener** (right): trending, new, almost-bonded, just-bonded and hot-searched tokens with a quick safety score, red-flag pills, market cap, 1h change, age and smart-money/KOL holders.
+- **Bottom row:** a heatmap of smart money's net buying per token in 5-minute buckets, live smart-money and KOL trades, your positions and the latest call-outs.
+
+**Token page with the chart trade box**
+
+<img src="docs/screenshots/token-chart.png" alt="kraken token chart with the quick-trade box and buy and sell markers" width="100%">
+
+- **Header and tiles:** the token, its launchpad and bonding progress, links to the website, X, GMGN and Solscan, plus price, market cap, liquidity, holders, recent change and volume.
+- **Chart:** TradingView-style candles with 1m to 4h timeframes, moving averages, auto trendlines and an OHLC readout.
+- **Quick trade box** (top-left of the chart): buy at market or place limit orders, sell 25%, 50% or all. Here a paper position was built and then sold at 100% for +6.3 SOL.
+- **Markers:** ▲ for each buy and ▼ for each sell, on the candle where it happened. While a position is open, a dashed AVG line shows your average entry with live P/L.
+- **Below the chart:** the pattern kraken reads from the candles and its chart score. Further down the page (not shown) are the safety score, dev history, holders and the buy panel.
 
 ---
 
