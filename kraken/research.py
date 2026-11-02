@@ -258,14 +258,14 @@ def token_dossier(client, chain: str, address: str, force=False) -> dict:
 
 
 # ── OHLCV for the trading chart ──────────────────────────────────────────────────────────
-CANDLE_WINDOW = {"1m": 6 * 3600, "5m": 2 * 86400, "15m": 5 * 86400, "1h": 20 * 86400, "4h": 90 * 86400}
+CANDLE_WINDOW = {"30s": 3 * 3600, "1m": 6 * 3600, "5m": 2 * 86400, "15m": 5 * 86400, "1h": 20 * 86400, "4h": 90 * 86400}
 
 
 def candles(client, chain: str, address: str, res: str) -> dict:
     if res not in CANDLE_WINDOW:
         raise ValueError("timeframe must be one of " + ", ".join(CANDLE_WINDOW))
     key = ("candles", chain, address, res)
-    if (c := CACHE.get(key, 20)):
+    if (c := CACHE.get(key, {"30s": 4, "1m": 8}.get(res, 20))):
         return c
     now = int(time.time())
     d = client.read(["market", "kline", "--address", address, "--resolution", res,

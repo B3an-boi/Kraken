@@ -289,7 +289,7 @@ const TV={
     chart.subscribeCrosshairMove(p=>{const b=p&&p.time!=null?bars[idx.get(p.time)]:null;this.hovering=!!b;show(b||bars[bars.length-1],b?idx.get(p.time):bars.length-1)});
     // live: pull fresh candles on a timer and update the last bars in place (no reload, view stays put)
     Object.assign(this,{idx,maS,maV,MAS,ma,showBar:show,closes});
-    clearInterval(this.liveT);const every={'1m':10,'5m':20,'15m':30,'1h':60,'4h':120}[res]||30;
+    clearInterval(this.liveT);const every={'30s':5,'1m':10,'5m':20,'15m':30,'1h':60,'4h':120}[res]||30;
     this.liveT=setInterval(()=>this.tick(),every*1000);
     this.avgLine=null;this.ordLines=[];this.pvLine=null;this.flagLines=[];this._bubSub=null;
     this.trade();this.syncPos();
@@ -452,7 +452,7 @@ async function openToken(addr){
     <div class="row" style="gap:6px;margin-top:6px">${t.launchpad?`<span class="tag">${esc(t.launchpad)}</span>`:''}<span class="tag ${t.bonded?'good':'warn'}">${t.bonded?'bonded':'on bonding curve '+pct(t.progress)}</span>${t.created?`<span class="tag">age ${fdur((Date.now()/1000-t.created)/60)}</span>`:''}${Object.entries(t.links||{}).map(([k,v])=>`<a class="tag" href="${esc(k==='twitter_username'&&!/^https?:/.test(v)?'https://x.com/'+v:v)}" target="_blank" rel="noopener noreferrer">${k==='twitter_username'?'X':esc(k)} ↗</a>`).join('')}<a class="tag" href="https://gmgn.ai/${esc(chainNow())}/token/${encodeURIComponent(addr)}" target="_blank" rel="noopener noreferrer">GMGN ↗</a><a class="tag" href="${scanUrl('token',addr)}" target="_blank" rel="noopener noreferrer">${scanName()} ↗</a></div></div></div>
   <div class="tiles">${[['Price',t.price?'$'+Number(t.price).toPrecision(4):'—'],['Market cap',money(t.mcap)],['Liquidity',money(t.liquidity)],['Holders',(t.holders||0).toLocaleString()],['5m / 1h',chg('5m')+' · '+chg('1h')],['Vol 1h',money(t.vol['1h']),`${t.buys_1h} buys · ${t.sells_1h} sells`]].map(([k,v,s])=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`).join('')}</div>
   <div class="card tv" style="margin-bottom:14px">
-    <div class="tvbar"><div class="tvleg" id="tvLeg"></div><div class="row" style="gap:8px"><button class="tvflag" id="tvFlag" aria-pressed="false" title="Show where Base Hunter flagged this token">⚑ Hunter flags</button><div class="tvtf" id="tvTf">${['1m','5m','15m','1h','4h'].map(r=>`<button data-res="${r}" class="${r===(d.chart.bar_min===1?'1m':'15m')?'on':''}">${r}</button>`).join('')}</div></div></div>
+    <div class="tvbar"><div class="tvleg" id="tvLeg"></div><div class="row" style="gap:8px"><button class="tvflag" id="tvFlag" aria-pressed="false" title="Show where Base Hunter flagged this token">⚑ Hunter flags</button><div class="tvtf" id="tvTf">${['30s','1m','5m','15m','1h','4h'].map(r=>`<button data-res="${r}" class="${r===(d.chart.bar_min===1?'1m':'15m')?'on':''}">${r}</button>`).join('')}</div></div></div>
     <div class="tvbox" id="tvBox"><div class="tvmsg" id="tvMsg"><span class="spin"></span> Loading chart…</div></div>
     ${d.chart.pattern?`<div class="row" style="margin-top:10px;gap:6px"><span class="tag">${esc(d.chart.pattern.pattern)}</span><span class="tag">chart score ${d.chart.pattern.score}</span><span class="sub">${d.chart.pattern.why.map(esc).join(' · ')}</span></div>`:''}
   </div>
