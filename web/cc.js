@@ -92,12 +92,22 @@ function renderDiscover(){
   let rows=CC.disc.tokens.filter(t=>CC.feed==='all'||t.sources.includes(CC.feed));
   if($('#dSafe').checked)rows=rows.filter(t=>t.safety>=60);
   if(CC.feed==='new')rows.sort((a,b)=>(a.age_min??1e9)-(b.age_min??1e9));
-  $('#dTbl').innerHTML=`<thead><tr><th>Token</th><th title="Quick safety from GMGN's listing data. Open the token for the full score.">Safety</th><th class="num">MC</th><th class="num">1h</th><th class="num">Age</th><th class="num" title="Smart money / KOL holders">SM/KOL</th></tr></thead><tbody>`+
-   (rows.length?rows.slice(0,150).map(t=>`<tr class="click" data-tok="${esc(t.address)}">
-     <td><div class="tok"><b>${esc(t.symbol)} <span class="sub" style="font-weight:400;font-size:11px">${esc(t.sources[0])}${t.progress!=null&&(t.sources.includes('new')||t.sources.includes('almost bonded'))?' · '+pct(t.progress)+' bonded':''}</span></b><span class="sub" style="font-size:11px;white-space:normal">${t.flags.length?t.flags.slice(0,2).map(f=>`<span class="${t.safety<60?'down':''}">${esc(f)}</span>`).join(' · '):'<span class="up">no flags</span>'}</span></div></td>
-     <td>${safeBadge(t.safety)}</td><td class="num">${money(t.mcap)}</td>
-     <td class="num ${t.chg_1h>=0?'up':'down'}">${t.chg_1h?spct(t.chg_1h,0):'—'}</td><td class="num">${ageTxt(t.age_min)}</td>
-     <td class="num">${t.smart}/${t.kol}</td></tr>`).join('')
+  // compact cells so nothing gets cut off with "…"
+  const cm=v=>v==null?'—':'$'+(v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(v>=1e7?0:1)+'M':v>=1e3?(v/1e3).toFixed(v>=1e5?0:1)+'K':Math.round(v));
+  const cage=m=>m==null?'—':m<60?Math.round(m)+'m':m<1440?Math.round(m/60)+'h':Math.round(m/1440)+'d';
+  const cchg=x=>!x?'—':(x>0?'+':'−')+(Math.abs(x)>=10?(Math.abs(x)*100/1000).toFixed(1)+'K':Math.round(Math.abs(x)*100))+'%';
+  const cn=n=>n>=1000?Math.round(n/100)/10+'k':n;
+  $('#dTbl').innerHTML=`<thead><tr><th>Token</th><th title="Quick safety from GMGN's listing data. Open the token for the full score.">Safety</th><th class="num">MC</th><th class="num">1h</th><th class="num">Age</th><th class="num" title="Smart money / KOL wallets holding">SM / KOL</th></tr></thead><tbody>`+
+   (rows.length?rows.slice(0,150).map(t=>{
+     const src=esc(t.sources[0])+(t.progress!=null&&(t.sources.includes('new')||t.sources.includes('almost bonded'))?` · ${pct(t.progress)}`:'');
+     const bad=t.safety!=null&&t.safety<60,fl=t.flags||[];
+     const pills=fl.length?fl.slice(0,2).map(f=>`<span class="fl ${bad?'bad':''}">${esc(f)}</span>`).join('')+(fl.length>2?`<span class="fl more" title="${esc(fl.slice(2).join(', '))}">+${fl.length-2}</span>`:''):'<span class="fl ok">no flags</span>';
+     return `<tr class="click" data-tok="${esc(t.address)}">
+     <td><div class="sr">${t.logo?`<img src="${esc(t.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`:`<i>${esc((t.symbol||'?')[0])}</i>`}
+       <div class="srt"><div class="srn"><b>${esc(t.symbol)}</b><span>${src}</span></div><div class="srf">${pills}</div></div></div></td>
+     <td>${safeBadge(t.safety)}</td><td class="num">${cm(t.mcap)}</td>
+     <td class="num ${t.chg_1h>0?'up':t.chg_1h<0?'down':'sub'}">${cchg(t.chg_1h)}</td><td class="num sub">${cage(t.age_min)}</td>
+     <td class="num" title="${t.smart||0} smart money · ${t.kol||0} KOL"><span class="${t.smart?'up':'sub'}">${cn(t.smart||0)}</span><span class="sub">/${cn(t.kol||0)}</span></td></tr>`}).join('')
    :'<tr><td colspan="6"><div class="empty">Nothing in this feed right now.</div></td></tr>')+'</tbody>';
 }
 function renderCallouts(){

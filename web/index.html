@@ -198,7 +198,22 @@ dialog::backdrop{background:#000a}
   .bars .br{grid-template-columns:90px 1fr 70px}
 }
 #dTbl{table-layout:fixed;min-width:0}
-#dTbl th:nth-child(1){width:auto}#dTbl th:nth-child(2){width:66px}#dTbl th:nth-child(3){width:78px}#dTbl th:nth-child(4){width:68px}#dTbl th:nth-child(5){width:56px}#dTbl th:nth-child(6){width:62px}
+#dTbl th:nth-child(1){width:auto}#dTbl th:nth-child(2){width:62px}#dTbl th:nth-child(3){width:70px}#dTbl th:nth-child(4){width:68px}#dTbl th:nth-child(5){width:50px}#dTbl th:nth-child(6){width:86px}
+#dTbl th,#dTbl td{padding-left:7px;padding-right:7px}#dTbl th:first-child,#dTbl td:first-child{padding-left:14px}#dTbl th:last-child,#dTbl td:last-child{padding-right:14px}
+#dTbl td{padding-top:10px;padding-bottom:10px;vertical-align:middle}
+#dTbl tbody tr{transition:background .12s}#dTbl tbody tr:hover{background:#ffffff06}
+.sr{display:flex;align-items:center;gap:10px;min-width:0}
+.sr img,.sr>i{width:30px;height:30px;border-radius:9px;flex:none;object-fit:cover;background:var(--raise)}
+.sr>i{display:grid;place-items:center;font:600 13px var(--sans);font-style:normal;color:var(--dim)}
+.srt{min-width:0;display:flex;flex-direction:column;gap:4px}
+.srn{display:flex;align-items:baseline;gap:7px;min-width:0}
+.srn b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+.srn span{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srf{display:flex;gap:4px;min-width:0;overflow:hidden}
+.fl{flex:none;font-size:10.5px;line-height:1;padding:3px 7px;border-radius:999px;background:var(--raise);color:var(--dim);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.fl.bad{background:#ff6a4d1a;color:var(--down)}
+.fl.ok{background:#3ddc8414;color:#3ddc84}
+.fl.more{color:var(--faint)}
 #dTbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #dTbl .tok b,#dTbl .tok span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
 .q-screen .qscroll{overflow-x:hidden}
