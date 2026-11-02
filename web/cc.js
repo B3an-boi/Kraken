@@ -143,11 +143,11 @@ const MiniGraph={
   nodes:new Map(),
   init(){const el=$('#mGraph');if(!el||typeof d3==='undefined'||this.svg)return!!this.svg;
     this.svg=d3.select(el).insert('svg',':first-child');this.g=this.svg.append('g');this.lg=this.g.append('g');this.ng=this.g.append('g');
-    this.svg.append('defs').html('<filter id="mglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>');
+    this.svg.append('defs').html('<filter id="mglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><clipPath id="mclip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>');
     this.svg.call(d3.zoom().scaleExtent([.3,3]).on('zoom',e=>this.g.attr('transform',e.transform)));
-    this.sim=d3.forceSimulation().force('link',d3.forceLink().id(d=>d.id).distance(55).strength(.5)).force('charge',d3.forceManyBody().strength(-70).distanceMax(220))
-      .force('collide',d3.forceCollide().radius(d=>d.r+4)).force('x',d3.forceX(()=>el.clientWidth/2).strength(.06)).force('y',d3.forceY(()=>el.clientHeight/2).strength(.06))
-      .on('tick',()=>{const W=el.clientWidth,H=el.clientHeight;for(const d of this.sim.nodes()){d.x=Math.max(d.r+4,Math.min(W-d.r-4,d.x));d.y=Math.max(d.r+4,Math.min(H-d.r-16,d.y))}this.lg.selectAll('line').attr('x1',l=>l.source.x).attr('y1',l=>l.source.y).attr('x2',l=>l.target.x).attr('y2',l=>l.target.y);this.ng.selectAll('g').attr('transform',d=>`translate(${d.x},${d.y})`)});
+    this.sim=d3.forceSimulation().force('link',d3.forceLink().id(d=>d.id).distance(62).strength(.35)).force('charge',d3.forceManyBody().strength(d=>d.type==='token'?-240:-60).distanceMax(260))
+      .force('collide',d3.forceCollide().radius(d=>d.type==='token'?d.r+22:d.r+4).iterations(2)).force('x',d3.forceX(()=>el.clientWidth/2).strength(.04)).force('y',d3.forceY(()=>el.clientHeight/2).strength(.05))
+      .on('tick',()=>{const W=el.clientWidth,H=el.clientHeight;for(const d of this.sim.nodes()){d.x=Math.max(d.r+4,Math.min(W-d.r-4,d.x));d.y=Math.max(d.r+24,Math.min(H-d.r-(d.type==='token'?26:8)-34,d.y))}this.lg.selectAll('line').attr('x1',l=>l.source.x).attr('y1',l=>l.source.y).attr('x2',l=>l.target.x).attr('y2',l=>l.target.y);this.ng.selectAll('g.n').attr('transform',d=>`translate(${d.x},${d.y})`)});
     return true},
   update(trades){
     if(!this.init())return;
@@ -165,17 +165,35 @@ const MiniGraph={
     if(!data.length){this.ng.selectAll('*').remove();this.lg.selectAll('*').remove();if(!el.querySelector('.empty-msg'))el.insertAdjacentHTML('beforeend','<div class="empty-msg sub" style="position:absolute;inset:0;display:grid;place-items:center">Waiting for smart-money trades…</div>');return}
     el.querySelectorAll('.empty-msg').forEach(x=>x.remove());
     const tip=$('#mTip');
+    // token logos from the Discover feed, when GMGN has one
+    const logo=new Map(((CC.disc&&CC.disc.tokens)||[]).filter(x=>x.logo).map(x=>[x.address,x.logo]));
     const L=this.lg.selectAll('line').data(ls,l=>l.key);L.exit().remove();
-    L.enter().append('line').merge(L).attr('stroke',l=>l.buy>=l.usd/2?'#ff5b37':'#8b8cff').attr('stroke-opacity',.45).attr('stroke-width',l=>.8+Math.min(3,Math.log10(1+l.usd)/1.5));
-    const N=this.ng.selectAll('g').data(data,d=>d.id);N.exit().remove();
-    const E=N.enter().append('g').style('cursor','pointer').call(d3.drag().on('start',(e,d)=>{if(!e.active)this.sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y}).on('end',(e,d)=>{if(!e.active)this.sim.alphaTarget(0);d.fx=d.fy=null}))
+    L.enter().append('line').merge(L).attr('stroke',l=>l.buy>=l.usd/2?'#8b8cff':'#ff6a4d').attr('stroke-opacity',.38)
+      .attr('stroke-dasharray',l=>l.buy>=l.usd/2?null:'3 3').attr('stroke-width',l=>.8+Math.min(2.6,Math.log10(1+l.usd)/1.6));
+    const N=this.ng.selectAll('g.n').data(data,d=>d.id);N.exit().remove();
+    const nb=id=>{const s=new Set([id]);for(const l of ls){const a=l.source.id||l.source,b=l.target.id||l.target;if(a===id)s.add(b);if(b===id)s.add(a)}return s};
+    const focus=d=>{const s=d?nb(d.id):null;this.ng.selectAll('g.n').style('opacity',x=>!s||s.has(x.id)?1:.15);
+      this.lg.selectAll('line').style('opacity',l=>!s||((l.source.id||l.source)===d.id||(l.target.id||l.target)===d.id)?1:.08)};
+    const E=N.enter().append('g').attr('class','n').style('cursor','pointer').call(d3.drag().on('start',(e,d)=>{if(!e.active)this.sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y}).on('end',(e,d)=>{if(!e.active)this.sim.alphaTarget(0);d.fx=d.fy=null}))
       .on('click',(e,d)=>d.type==='token'?goToken(d.id):goWallet(d.id))
-      .on('mouseenter',(e,d)=>{tip.innerHTML=`<b>${esc(d.label)}</b><br><span class="sub">${d.type==='token'?'token':d.type==='sm'?'smart money':d.type==='kol'?'KOL':'followed wallet'} · ${money(d.usd)} traded in 1h</span>`;tip.style.display='block'})
-      .on('mousemove',e=>{const r=el.getBoundingClientRect();tip.style.left=(e.clientX-r.left+12)+'px';tip.style.top=(e.clientY-r.top+12)+'px'}).on('mouseleave',()=>tip.style.display='none');
-    E.append('circle');E.append('text').attr('text-anchor','middle').style('font-family','var(--mono)').style('font-size','10px').style('fill','#c9c9cf').style('pointer-events','none').style('paint-order','stroke').style('stroke','#0f0f11').style('stroke-width','3px');
+      .on('mouseenter',(e,d)=>{focus(d);const deg=nb(d.id).size-1;
+        tip.innerHTML=d.type==='token'?`<b>${esc(d.label)}</b><div class="sub">${deg} wallet${deg===1?'':'s'} · ${money(d.usd)} traded in 1h</div><div class="sub" style="margin-top:3px">Click to research</div>`
+          :`<b>${esc(d.label)}</b><div class="sub">${d.type==='sm'?'Smart money':d.type==='kol'?'KOL':'Followed wallet'} · ${deg} token${deg===1?'':'s'} · ${money(d.usd)}</div><div class="sub" style="margin-top:3px">Click to open wallet</div>`;tip.style.display='block'})
+      .on('mousemove',e=>{const r=el.getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;tip.style.left=Math.min(x+14,r.width-tip.offsetWidth-6)+'px';tip.style.top=(y+14)+'px'})
+      .on('mouseleave',()=>{focus(null);tip.style.display='none'});
+    E.append('circle').attr('class','c');E.append('image').attr('clip-path','url(#mclip)').attr('preserveAspectRatio','xMidYMid slice').style('pointer-events','none');
+    const lab=E.append('g').attr('class','lab').style('pointer-events','none');lab.append('rect').attr('rx',6);lab.append('text').attr('text-anchor','middle').attr('dy','0.35em');
     const M=E.merge(N);
-    M.select('circle').attr('r',d=>d.r).attr('fill',d=>d.type==='token'?'#ff5b37':d.type==='kol'?'#c4c5ff':'#8b8cff').attr('filter',d=>d.type==='token'?'url(#mglow)':null).attr('stroke','#0f0f11').attr('stroke-width',1.5);
-    M.select('text').attr('dy',d=>d.r+11).text(d=>d.type==='token'||d.usd>2000?d.label:'');
+    M.select('circle.c').attr('r',d=>d.r).attr('fill',d=>d.type==='token'?'#ff5b37':d.type==='kol'?'#c4c5ff':'#8b8cff')
+      .attr('stroke',d=>d.type==='token'?'#ff5b37':'#0f0f11').attr('stroke-width',d=>d.type==='token'?2:1.5).attr('filter',d=>d.type==='token'?'url(#mglow)':null);
+    M.select('image').each(function(d){const u=d.type==='token'&&logo.get(d.id);const im=d3.select(this);
+      if(!u){im.attr('href',null).attr('width',0);return}const s=(d.r-1.5)*2;im.attr('x',-s/2).attr('y',-s/2).attr('width',s).attr('height',s);
+      if(im.attr('href')!==u){im.attr('href',u);this.onerror=()=>im.attr('width',0)}});
+    M.select('g.lab').style('display',d=>d.type==='token'?null:'none').attr('transform',d=>`translate(0,${d.r+12})`).each(function(d){if(d.type!=='token')return;
+      const g=d3.select(this),tx=g.select('text').text(d.label.length>12?d.label.slice(0,11)+'…':d.label),w=(tx.node().getComputedTextLength()||30)+12;
+      g.select('rect').attr('x',-w/2).attr('y',-8.5).attr('width',w).attr('height',17)});
+    const tokens=data.filter(d=>d.type==='token').length,wn=data.length-tokens,vol=data.filter(d=>d.type==='token').reduce((s,d)=>s+d.usd,0);
+    const st=$('#mStats');if(st)st.textContent=`${tokens} tokens · ${wn} wallets · ${money(vol)}`;
     this.sim.nodes(data);this.sim.force('link').links(ls);this.sim.alpha(this.started?.25:1).restart();this.started=true;
   }
 };
